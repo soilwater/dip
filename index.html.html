@@ -1,0 +1,1568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kansas Irrigation Scheduler</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --mw:   920px;
+  --g:    #16a34a;
+  --glt:  #f0fdf4;
+  --gbdr: #bbf7d0;
+  --amb:  #d97706;
+  --amlt: #fffbeb;
+  --ambdr:#fde68a;
+  --pvlt: #f5f3ff;
+  --pvbdr:#e9d5ff;
+  --red:  #dc2626;
+  --bdr:  #e2e8f0;
+  --txt:  #0f172a;
+  --mut:  #64748b;
+  --sllt: #f8fafc;
+  --shd:  0 1px 3px rgba(0,0,0,.08);
+  --teal: #0d9488;
+  --tealt:rgba(13,148,136,.09);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;font-size:16px;background:#eef2f7;color:var(--txt);line-height:1.5;}
+
+/* ── Header ── */
+header{background:#fff;border-top:3px solid var(--g);border-bottom:1px solid var(--bdr);}
+.header-inner{max-width:var(--mw);margin:0 auto;padding:14px;display:flex;align-items:baseline;gap:14px;}
+header h1{font-size:1.1em;font-weight:700;letter-spacing:-.01em;}
+
+/* ── Wrapper ── */
+.wrap{max-width:var(--mw);margin:0 auto;padding:16px 14px 52px;}
+.card{background:#fff;border:1px solid var(--bdr);border-radius:8px;padding:18px 20px;margin-bottom:12px;box-shadow:var(--shd);}
+.ctitle{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--g);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--bdr);}
+
+/* ── Setup grid ── */
+.setup-outer{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:stretch;}
+.setup-col{display:flex;flex-direction:column;gap:12px;}
+.setup-col .grp:last-child{flex:1;display:flex;flex-direction:column;}
+
+/* ── Input groups ── */
+.grp{border-radius:7px;padding:14px 16px;border:1px solid transparent;}
+.gtitle{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin-bottom:12px;}
+.grp-loc {background:var(--pvlt);border-color:var(--pvbdr);}
+.grp-crop{background:var(--pvlt);border-color:var(--pvbdr);}
+.grp-soil{background:var(--pvlt);border-color:var(--pvbdr);}
+.grp-pvt {background:var(--pvlt);border-color:var(--pvbdr);}
+
+.fg  {display:grid;gap:10px;}
+.fg-2{grid-template-columns:1fr 1fr;}
+
+label{display:block;font-size:14px;font-weight:600;color:var(--mut);margin-bottom:5px;white-space:nowrap;}
+select,input[type=date],input[type=number]{
+  width:100%;padding:9px 11px;font-size:16px;font-family:inherit;
+  border:1.5px solid var(--bdr);border-radius:5px;background:#fff;color:var(--txt);
+}
+select:focus,input:focus{outline:none;border-color:var(--g);box-shadow:0 0 0 2px rgba(22,163,74,.15);}
+
+.radio-row{display:flex;gap:14px;align-items:center;flex-wrap:wrap;padding:4px 0;}
+.radio-row label{display:flex;align-items:center;gap:6px;font-size:15px;font-weight:500;color:var(--txt);margin:0;white-space:nowrap;}
+.radio-row input[type=radio]{width:16px;height:16px;margin:0;}
+
+/* ── MAD segmented buttons ── */
+.seg{display:flex;border:1.5px solid var(--bdr);border-radius:5px;overflow:hidden;margin-top:2px;}
+.seg button{flex:1;padding:9px 4px;font-size:15px;font-family:inherit;font-weight:600;border:none;border-right:1.5px solid var(--bdr);background:#fff;color:var(--mut);cursor:pointer;transition:background .12s,color .12s;}
+.seg button:last-child{border-right:none;}
+.seg button.on{background:var(--g);color:#fff;}
+
+/* ── Kc editor ── */
+.kc-wrap{margin-top:12px;flex:1;display:flex;flex-direction:column;}
+.kc-hdr{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;}
+.kc-hdr label{margin:0;font-size:14px;}
+.kc-total{font-size:13px;color:var(--mut);}
+#kcSvg{display:block;width:100%;flex:1;min-height:160px;border:1.5px solid var(--gbdr);border-radius:6px;background:#fafafa;touch-action:none;}
+.kc-hint{font-size:12px;color:var(--mut);margin-top:5px;}
+
+/* ── Chart mode toggle ── */
+.chart-toggle{display:flex;border:1.5px solid var(--bdr);border-radius:4px;overflow:hidden;}
+.chart-toggle button{padding:4px 12px;font-size:11px;font-family:inherit;font-weight:700;text-transform:uppercase;letter-spacing:.05em;border:none;border-right:1.5px solid var(--bdr);background:#fff;color:var(--mut);cursor:pointer;transition:background .12s,color .12s;}
+.chart-toggle button:last-child{border-right:none;}
+.chart-toggle button.on{background:var(--g);color:#fff;}
+
+/* ── AI Summary panel ── */
+#aiPanel{background:#fafdf7;border-color:var(--gbdr);}
+#aiText{font-size:15px;line-height:1.75;color:var(--txt);}
+#aiText strong{color:var(--txt);font-weight:700;}
+#aiText p{margin-bottom:0.6em;}
+#aiLoading{font-size:14px;color:var(--mut);font-style:italic;padding:4px 0;}
+.btn-sm.ai-alert{background:#fef2f2;color:var(--red);border-color:#fca5a5;}
+
+/* ── Buttons ── */
+.btn-go{background:var(--g);color:#fff;border:none;border-radius:6px;padding:11px 26px;font-size:16px;font-family:inherit;font-weight:600;cursor:pointer;}
+.btn-go:hover{background:#15803d;}
+.btn-sm{background:#fff;color:var(--mut);border:1.5px solid var(--bdr);border-radius:4px;padding:6px 14px;font-size:14px;font-family:inherit;cursor:pointer;}
+.btn-sm:hover{background:var(--sllt);}
+
+/* ── Results header (title + action buttons) ── */
+.results-hdr{
+  display:flex;justify-content:space-between;align-items:center;
+  flex-wrap:wrap;gap:8px;margin-bottom:10px;
+}
+#resultsTitle{font-size:13px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.07em;}
+
+/* ── Collapsible details panel ── */
+details.analytics{margin-bottom:0;}
+summary.analytics-toggle{
+  cursor:pointer;list-style:none;
+  display:flex;align-items:center;gap:8px;
+  font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;
+  color:var(--mut);padding:10px 0 6px;
+  user-select:none;
+}
+summary.analytics-toggle::-webkit-details-marker{display:none;}
+summary.analytics-toggle::before{content:'▸';font-size:10px;transition:transform .2s;display:inline-block;}
+details[open] summary.analytics-toggle::before{transform:rotate(90deg);}
+
+/* ── Summary tiles ── */
+.sum-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(95px,1fr));gap:6px;}
+.sitem{background:var(--sllt);border:1px solid var(--bdr);border-radius:5px;padding:7px 9px;text-align:center;}
+.sval{font-size:1.05em;font-weight:700;color:var(--txt);}
+.sval.ok{color:var(--g);} .sval.warn{color:var(--amb);} .sval.bad{color:var(--red);}
+.slbl{font-size:11px;color:var(--mut);margin-top:2px;text-transform:uppercase;letter-spacing:.04em;}
+
+/* ── Charts ── */
+.ct-top{position:relative;height:210px;}
+.ct-bot{position:relative;height:115px;margin-top:8px;}
+/* ── Table ── */
+.tscroll{overflow-x:auto;}
+table{border-collapse:collapse;width:100%;font-size:14px;}
+thead th{background:var(--sllt);color:var(--mut);padding:7px 8px;text-align:center;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;border-bottom:2px solid var(--bdr);white-space:nowrap;}
+thead th.tl{text-align:left;}
+tbody td{padding:6px 8px;text-align:center;border-bottom:1px solid #f1f5f9;white-space:nowrap;vertical-align:middle;}
+tbody td.tl{text-align:left;}
+tbody tr:hover{background:#f8fafc!important;}
+
+.r-irr{background:#fff7ed;} .r-run{background:#f7fbff;} .r-str{background:#fef3c7;}
+tr.obs td:first-child{border-left:3px solid #bbf7d0;}
+tr.fut td{color:#b0bec5;} tr.fut .tag{opacity:1;}
+
+.tag{display:inline-block;padding:3px 9px;border-radius:3px;font-size:13px;font-weight:700;white-space:nowrap;}
+.tag-ok {background:var(--glt); color:var(--g);}
+.tag-irr{background:#fff7ed;    color:#c2410c;}
+.tag-run{background:#e0f2fe;    color:#0369a1;}
+.tag-str{background:var(--amlt);color:var(--amb);}
+
+/* ── Editable rain cells ── */
+td.rain-cell{cursor:text;}
+td.rain-edited{background:var(--tealt)!important;position:relative;}
+td.rain-edited::after{content:'●';font-size:6px;color:var(--teal);vertical-align:super;margin-left:2px;}
+.rain-input{width:58px;padding:3px 5px;font-size:14px;font-family:inherit;border:1.5px solid var(--g);border-radius:3px;text-align:center;background:#fff;}
+
+.legend{display:flex;gap:13px;flex-wrap:wrap;font-size:14px;color:var(--mut);margin-bottom:10px;}
+.legend span{display:flex;align-items:center;gap:5px;}
+.lb{display:inline-block;width:12px;height:12px;border-radius:2px;}
+.note{font-size:13px;color:var(--mut);margin-top:12px;line-height:1.7;}
+#results{display:none;}
+
+/* ── Responsive: tablet (≤ 700px) ── */
+@media (max-width: 700px) {
+  /* Setup collapses to single column */
+  .setup-outer{grid-template-columns:1fr;}
+
+  /* Kc crop group no longer needs to stretch to fill column */
+  .setup-col .grp:last-child{flex:none;}
+
+  /* Give Kc chart a fixed comfortable height instead of flex-grow */
+  .kc-wrap{flex:none;}
+  #kcSvg{min-height:180px;max-height:220px;}
+
+  /* Inner 2-col grids collapse to single column */
+  .fg-2{grid-template-columns:1fr;}
+
+  /* Radio options wrap naturally */
+  .radio-row label{white-space:normal;}
+
+  /* Slightly tighter card padding */
+  .card{padding:14px 14px;}
+  .grp{padding:12px 13px;}
+
+  /* Summary tiles: 2 per row minimum */
+  .sum-grid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr));}
+
+  /* Shorter charts on mobile */
+  .ct-top{height:170px;}
+  .ct-bot{height:95px;}
+
+  /* Table font slightly smaller to reduce horizontal scroll */
+  table{font-size:12px;}
+  thead th{padding:6px 6px;font-size:10px;}
+  tbody td{padding:5px 6px;}
+
+  /* Results title wraps gracefully */
+  .results-hdr{flex-direction:column;align-items:flex-start;gap:6px;}
+}
+
+/* ── Responsive: phone (≤ 420px) ── */
+@media (max-width: 420px) {
+  body{font-size:15px;}
+  .card{padding:12px 12px;}
+  .grp{padding:11px 12px;}
+
+  /* Keep crop + date side by side on phones — they fit */
+  /* Everything else single column already from 700px breakpoint */
+
+  /* Make the generate button full width */
+  .btn-go{width:100%;text-align:center;}
+
+  /* Smaller charts */
+  .ct-top{height:150px;}
+  .ct-bot{height:80px;}
+}
+
+@media print{
+  .no-print{display:none!important;}
+  /* Strip all page chrome to prevent blank first page */
+  header{display:none!important;}
+  body{background:#fff;margin:0;padding:0;}
+  .wrap{padding:0;margin:0;}
+  #results{padding:0;margin:0;}
+  /* Hide everything except the table card */
+  .results-hdr,#aiPanel,details.analytics,
+  .card:not(#tableCard){display:none!important;}
+  #tableCard{display:block!important;box-shadow:none;border:1px solid #ccc;margin:0;page-break-inside:auto;}
+  thead th,.r-irr,.r-str,.r-run{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  tr.obs td:first-child{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  /* Ensure table stays together where possible */
+  thead{display:table-header-group;}
+  tbody tr{page-break-inside:avoid;}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <h1>Daily Irrigation Planner</h1>
+  </div>
+</header>
+
+<div class="wrap">
+
+<!-- ══════════  SETUP  ══════════ -->
+<div class="card no-print">
+  <div class="setup-outer">
+
+    <!-- LEFT: Location + Crop & Season -->
+    <div class="setup-col">
+
+      <div class="grp grp-loc">
+        <div class="gtitle">Location</div>
+        <div>
+          <label>Mesonet Station</label>
+          <select id="station"></select>
+        </div>
+      </div>
+
+      <div class="grp grp-crop">
+        <div class="gtitle">Crop &amp; Season</div>
+        <div class="fg fg-2" style="margin-bottom:10px;">
+          <div>
+            <label>Crop</label>
+            <select id="crop" onchange="onCropChange()">
+              <option value="corn">Corn</option>
+              <option value="soybean">Soybean</option>
+              <option value="sorghum">Grain Sorghum</option>
+              <option value="winterWheat">Winter Wheat</option>
+              <option value="sunflower">Sunflower</option>
+            </select>
+          </div>
+          <div>
+            <label>Planting Date</label>
+            <input type="date" id="plantingDate">
+          </div>
+        </div>
+        <div class="kc-wrap">
+          <div class="kc-hdr">
+            <label>Kc Curve</label>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span class="kc-total" id="kcTotalLabel"></span>
+              <button type="button" onclick="onCropChange()" style="font-size:11px;padding:2px 8px;background:#fff;border:1px solid var(--pvbdr);border-radius:3px;color:var(--mut);cursor:pointer;font-family:inherit;">Reset</button>
+            </div>
+          </div>
+          <svg id="kcSvg" viewBox="0 0 500 160" preserveAspectRatio="none"></svg>
+          <p class="kc-hint">Drag ● up/down → Kc value &nbsp;·&nbsp; left/right → stage length</p>
+        </div>
+      </div>
+
+    </div><!-- /left col -->
+
+    <!-- RIGHT: Soil + Center Pivot -->
+    <div class="setup-col">
+
+      <div class="grp grp-soil">
+        <div class="gtitle">Soil</div>
+        <div style="margin-bottom:8px;">
+          <label>Texture</label>
+          <select id="soilType">
+            <option value="sand">Sand</option>
+            <option value="loamySand">Loamy Sand</option>
+            <option value="sandyLoam">Sandy Loam</option>
+            <option value="loam">Loam</option>
+            <option value="siltLoam" selected>Silt Loam</option>
+            <option value="clayLoam">Clay Loam</option>
+            <option value="sandyClay">Sandy Clay</option>
+            <option value="siltyClay">Silty Clay</option>
+            <option value="clay">Clay</option>
+          </select>
+        </div>
+        <label style="margin-bottom:2px;">Root Depth Profile</label>
+        <div class="radio-row">
+          <label><input type="radio" name="rdMode" value="constant"> Constant</label>
+          <label><input type="radio" name="rdMode" value="dynamic" checked> Dynamic</label>
+        </div>
+        <div class="fg fg-2" style="margin-top:10px;">
+          <div>
+            <label>Max. Root Depth (in)</label>
+            <input type="number" id="rootDepth" value="48" min="8" max="96">
+          </div>
+          <div>
+            <label>Initial Water (%TAW)</label>
+            <input type="number" id="initWater" value="75" min="0" max="100">
+          </div>
+        </div>
+      </div>
+
+      <div class="grp grp-pvt">
+        <div class="gtitle">Center Pivot</div>
+        <div class="fg fg-2" style="margin-bottom:10px;">
+          <div>
+            <label>Field Size (ac)</label>
+            <input type="number" id="fieldArea" value="125" min="1">
+          </div>
+          <div>
+            <label>Pump Capacity (gpm)</label>
+            <input type="number" id="pumpGPM" value="800" min="1">
+          </div>
+        </div>
+        <div class="fg fg-2" style="margin-bottom:10px;">
+          <div>
+            <label>Efficiency (%)</label>
+            <input type="number" id="sprinkEff" value="85" min="50" max="100">
+          </div>
+          <div id="fixedDepthWrap">
+            <label>Application Depth</label>
+            <select id="appDepth" onchange="onAppDepth()">
+              <option value="0.5">0.5 in</option>
+              <option value="1.0" selected>1.0 in</option>
+              <option value="1.5">1.5 in</option>
+              <option value="custom">Custom…</option>
+            </select>
+          </div>
+          <div id="customDepthWrap" style="display:none;">
+            <label>Custom (in)</label>
+            <input type="number" id="appDepthCustom" value="1.0" step="0.1" min="0.1" max="5">
+          </div>
+        </div>
+        <!-- Live revolution time display -->
+        <p id="revTimeDisplay" style="font-size:13px;color:var(--mut);margin-bottom:8px;"></p>
+
+        <div style="margin-bottom:10px;">
+          <label style="margin-bottom:4px;">Irrigation Strategy</label>
+          <div class="radio-row">
+            <label><input type="radio" name="irrMode" value="fixed" checked onchange="onIrrMode()"> Fixed depth</label>
+            <label><input type="radio" name="irrMode" value="refill" onchange="onIrrMode()"> Refill to FC</label>
+            <label><input type="radio" name="irrMode" value="none" onchange="onIrrMode()"> No irrigation</label>
+          </div>
+        </div>
+        <div id="madWrap">
+          <label style="margin-bottom:4px;">Trigger — Management Allowed Depletion (MAD)</label>
+          <div class="seg">
+            <button type="button" id="mad30" onclick="setMAD(30)">30%</button>
+            <button type="button" id="mad40" onclick="setMAD(40)">40%</button>
+            <button type="button" id="mad50" class="on" onclick="setMAD(50)">50%</button>
+            <button type="button" id="mad60" onclick="setMAD(60)">60%</button>
+            <button type="button" id="mad70" onclick="setMAD(70)">70%</button>
+          </div>
+          <input type="hidden" id="mad" value="50">
+        </div>
+      </div>
+
+    </div><!-- /right col -->
+  </div><!-- /setup-outer -->
+
+  <div style="margin-top:16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+    <button class="btn-go" onclick="generateSchedule()">▶ Generate Schedule</button>
+  </div>
+</div>
+
+
+<!-- ══════════  RESULTS  ══════════ -->
+<div id="results">
+
+  <!-- Title bar + actions -->
+  <div class="results-hdr">
+    <span id="resultsTitle"></span>
+    <div class="no-print" style="display:flex;gap:6px;">
+      <button id="btnAI" class="btn-sm" onclick="toggleAIPanel()"
+        style="background:var(--glt);color:var(--g);border-color:var(--gbdr);font-weight:700;">✦ AI Summary</button>
+      <button class="btn-sm" onclick="window.print()">🖨 Print</button>
+      <button class="btn-sm" onclick="downloadCSV()">⬇ CSV</button>
+    </div>
+  </div>
+
+  <!-- AI Summary panel -->
+  <div id="aiPanel" class="card no-print" style="display:none;">
+    <div id="aiLoading" style="display:none;">⏳ Analyzing your irrigation schedule…</div>
+    <div id="aiText"></div>
+    <div style="margin-top:10px;">
+      <button class="btn-sm" onclick="fetchAISummary()">↺ Refresh</button>
+    </div>
+  </div>
+
+  <!-- Season metrics — expanded by default, collapsible -->
+  <details class="analytics" open>
+    <summary class="analytics-toggle no-print">Season Summary</summary>
+    <div class="card" style="margin-top:8px;">
+      <div class="sum-grid" id="summaryStats"></div>
+    </div>
+  </details>
+
+  <!-- Chart — always visible -->
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <span class="ctitle" style="margin:0;border:none;padding:0;">Soil Water Balance</span>
+      <div class="chart-toggle no-print">
+        <button id="btnStorage"   class=""   onclick="toggleChartMode('storage')">Storage</button>
+        <button id="btnDepletion" class="on" onclick="toggleChartMode('depletion')">Depletion</button>
+      </div>
+    </div>
+    <div class="ct-top"><canvas id="chartTop"></canvas></div>
+    <div class="ct-bot"><canvas id="chartBot"></canvas></div>
+  </div>
+
+  <!-- Table — always visible -->
+  <div class="card" id="tableCard">
+    <p class="note no-print" style="margin-bottom:10px;">
+      💧 <strong>Tip:</strong> Click any observed rain cell to enter your own field measurement — values are saved and persist across visits.
+    </p>
+    <div class="legend no-print">
+      <span><span class="lb" style="background:#fff7ed;border:1px solid #fb923c;"></span>Irrigate</span>
+      <span><span class="lb" style="background:#f7fbff;border:1px solid #bae6fd;"></span>Running</span>
+      <span style="color:#b0bec5;">Faded = forecast</span>
+      <span><span class="lb" style="background:var(--tealt);border:1px solid rgba(13,148,136,.35);"></span>Rain edited</span>
+    </div>
+    <div class="tscroll">
+      <table id="schedTable">
+        <thead>
+          <tr>
+            <th class="tl" style="width:28px">#</th>
+            <th class="tl" style="min-width:88px">Date</th>
+            <th style="min-width:52px">Rain (in)</th>
+            <th style="min-width:52px">ETo (in)</th>
+            <th style="min-width:38px">Kc</th>
+            <th style="min-width:52px">ETc (in)</th>
+            <th style="min-width:72px">Storage (in)</th>
+            <th style="min-width:52px">TAW (%)</th>
+            <th id="grossHeader" style="min-width:72px">Gross (in)</th>
+            <th style="min-width:90px">Status</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-top:12px;">
+      <p class="note" style="margin:0;flex:1;">
+        Future days use a 7-day rolling ETo average blended with a statewide daily climatology and assume zero precipitation.
+      </p>
+      <button id="resetRainBtn" class="btn-sm no-print" onclick="resetAllRain()" style="display:none;white-space:nowrap;">↺ Restore Mesonet rain</button>
+    </div>
+  </div>
+
+</div><!-- /results -->
+</div><!-- /wrap -->
+
+<script>
+// ═══════════════  STATIC DATA  ════════════════════
+
+const STATION_LATS = {
+  "Ashland Bottoms":39.13,"Atchison":39.56,"Belleville":39.83,
+  "Caney":37.01,"Chanute":37.68,"Clay Center":39.38,"Colby":39.39,
+  "Coldwater":37.27,"Concordia":39.55,"Derby":37.72,
+  "Dodge City":37.77,"El Dorado":37.82,"Emporia":38.40,
+  "Ensign":37.64,"Garden City":37.97,"Goodland":39.35,
+  "Great Bend":38.35,"Greensburg":37.60,"Gypsum":38.71,
+  "Hamilton":38.00,"Hays":38.86,"Hiawatha":39.85,"Hill City":39.37,
+  "Holton":39.47,"Hutchinson":37.99,"Iola":37.93,
+  "Junction City":39.02,"Kingman":37.64,"Kinsley":37.93,
+  "Larned":38.18,"Liberal":37.04,"Logan":39.65,
+  "Manhattan":39.19,"Marion":38.35,"Meade":37.28,
+  "Medicine Lodge":37.28,"Minneapolis":39.12,"Moundridge":38.20,
+  "Ness City":38.46,"Newton":38.04,"Oakley":39.13,
+  "Oberlin":39.82,"Osborne":39.44,"Ottawa":38.61,
+  "Parsons":37.34,"Phillipsburg":39.75,"Plainville":39.23,
+  "Pratt":37.65,"Russell":38.90,"Sabetha":39.90,
+  "Salina":38.84,"Scott City":38.47,"Smith Center":39.78,
+  "St. John":37.99,"Sublette":37.48,"Syracuse":37.98,
+  "Tribune":38.47,"Ulysses":37.58,"WaKeeney":39.02,
+  "Wellington":37.27,"Wichita":37.69,"Winfield":37.24
+};
+
+
+// Statewide median ETo (in/day) indexed by DOY-1 (0=Jan1, 365=Dec31). Used for forecast.
+const eto_state = [0.03 , 0.03 , 0.03 , 0.03 , 0.03 , 0.03 , 0.03 , 0.03 , 0.03 ,
+       0.031, 0.031, 0.031, 0.031, 0.031, 0.032, 0.032, 0.032, 0.032,
+       0.033, 0.034, 0.034, 0.035, 0.035, 0.036, 0.037, 0.038, 0.039,
+       0.04 , 0.041, 0.043, 0.045, 0.045, 0.046, 0.047, 0.047, 0.047,
+       0.048, 0.049, 0.051, 0.051, 0.051, 0.053, 0.054, 0.054, 0.055,
+       0.055, 0.056, 0.056, 0.057, 0.057, 0.057, 0.059, 0.061, 0.064,
+       0.067, 0.069, 0.074, 0.082, 0.088, 0.088, 0.088, 0.089, 0.09 ,
+       0.091, 0.093, 0.097, 0.101, 0.102, 0.102, 0.102, 0.103, 0.103,
+       0.103, 0.103, 0.104, 0.105, 0.106, 0.106, 0.106, 0.106, 0.106,
+       0.108, 0.113, 0.117, 0.119, 0.12 , 0.122, 0.123, 0.127, 0.131,
+       0.134, 0.136, 0.139, 0.141, 0.142, 0.144, 0.145, 0.146, 0.147,
+       0.148, 0.148, 0.148, 0.148, 0.149, 0.149, 0.15 , 0.151, 0.151,
+       0.151, 0.152, 0.153, 0.154, 0.155, 0.155, 0.155, 0.155, 0.155,
+       0.155, 0.157, 0.157, 0.158, 0.162, 0.165, 0.165, 0.165, 0.165,
+       0.165, 0.165, 0.165, 0.164, 0.164, 0.165, 0.168, 0.169, 0.171,
+       0.171, 0.171, 0.173, 0.173, 0.175, 0.176, 0.178, 0.178, 0.178,
+       0.178, 0.179, 0.182, 0.182, 0.186, 0.191, 0.198, 0.199, 0.202,
+       0.206, 0.207, 0.21 , 0.212, 0.217, 0.224, 0.226, 0.227, 0.229,
+       0.229, 0.23 , 0.231, 0.232, 0.234, 0.234, 0.234, 0.234, 0.234,
+       0.234, 0.234, 0.234, 0.234, 0.234, 0.234, 0.234, 0.234, 0.234,
+       0.234, 0.233, 0.231, 0.23 , 0.23 , 0.23 , 0.23 , 0.229, 0.228,
+       0.227, 0.227, 0.226, 0.225, 0.224, 0.223, 0.223, 0.222, 0.22 ,
+       0.22 , 0.22 , 0.22 , 0.22 , 0.22 , 0.22 , 0.22 , 0.219, 0.218,
+       0.216, 0.215, 0.214, 0.214, 0.211, 0.208, 0.205, 0.202, 0.201,
+       0.201, 0.2  , 0.198, 0.195, 0.195, 0.195, 0.195, 0.194, 0.193,
+       0.191, 0.191, 0.19 , 0.189, 0.188, 0.188, 0.188, 0.187, 0.187,
+       0.187, 0.187, 0.187, 0.186, 0.185, 0.183, 0.183, 0.181, 0.18 ,
+       0.179, 0.178, 0.177, 0.176, 0.173, 0.173, 0.17 , 0.169, 0.169,
+       0.168, 0.168, 0.168, 0.167, 0.166, 0.166, 0.164, 0.161, 0.156,
+       0.153, 0.151, 0.149, 0.149, 0.145, 0.139, 0.138, 0.138, 0.137,
+       0.137, 0.137, 0.136, 0.135, 0.135, 0.134, 0.134, 0.132, 0.129,
+       0.126, 0.123, 0.12 , 0.118, 0.117, 0.117, 0.116, 0.114, 0.112,
+       0.112, 0.11 , 0.108, 0.107, 0.105, 0.103, 0.102, 0.101, 0.093,
+       0.085, 0.082, 0.08 , 0.08 , 0.08 , 0.079, 0.077, 0.075, 0.073,
+       0.073, 0.072, 0.071, 0.069, 0.067, 0.067, 0.066, 0.066, 0.065,
+       0.065, 0.065, 0.064, 0.064, 0.062, 0.061, 0.06 , 0.059, 0.058,
+       0.056, 0.055, 0.054, 0.054, 0.052, 0.05 , 0.05 , 0.049, 0.048,
+       0.046, 0.045, 0.044, 0.044, 0.043, 0.043, 0.043, 0.042, 0.042,
+       0.041, 0.041, 0.041, 0.04 , 0.039, 0.039, 0.039, 0.039, 0.039,
+       0.038, 0.038, 0.038, 0.038, 0.038, 0.038, 0.037, 0.036, 0.036,
+       0.035, 0.035, 0.034, 0.035, 0.034, 0.034, 0.034]
+
+// FAO-56 Kc values. stages=[Lini,Ldev,Lmid,Llate] days. plantDate='MM-DD' for Kansas.
+// Winter wheat: Oct 15 planting → ~240 days to ~Jun 12 harvest.
+// Ldev is long (120 d) to accommodate winter dormancy; Kc rises linearly through it,
+// which is a simplification — actual Kc stalls near Kc_ini during dormancy.
+const CROPS = {
+  corn:        {name:"Corn",         Kc_ini:.30,Kc_mid:1.20,Kc_end:.60,stages:[30,40,50,30],root:48,plantDate:'05-01'},
+  soybean:     {name:"Soybean",      Kc_ini:.40,Kc_mid:1.15,Kc_end:.50,stages:[20,35,60,25],root:36,plantDate:'05-15'},
+  sorghum:     {name:"Grain Sorghum",Kc_ini:.30,Kc_mid:1.00,Kc_end:.55,stages:[20,35,40,30],root:48,plantDate:'06-01'},
+  // Winter wheat: Oct 15 planting → ~250 days to ~Jun 22 harvest.
+  // Lini=135 covers emergence + entire winter dormancy (Oct 15 → late Feb, Kc stays low ≈ 0.30).
+  // Ldev=45 covers rapid spring green-up (Mar → mid-Apr).
+  // Lmid=55 covers heading and grain fill (mid-Apr → Jun 10).
+  // Llate=15 covers rapid dry-down to harvest (Jun 10 → Jun 25).
+  winterWheat: {name:"Winter Wheat", Kc_ini:.10,Kc_mid:1.15,Kc_end:.25,stages:[135,45,55,15],root:48,plantDate:'10-15'},
+  sunflower:   {name:"Sunflower",    Kc_ini:.35,Kc_mid:1.10,Kc_end:.35,stages:[25,35,45,25],root:48,plantDate:'05-20'},
+};
+
+const SOILS = {
+  sand:      {FC:10,WP:4, CN:72}, loamySand:{FC:14,WP:6, CN:74},
+  sandyLoam: {FC:20,WP:9, CN:78}, loam:     {FC:28,WP:13,CN:82},
+  siltLoam:  {FC:31,WP:14,CN:84}, clayLoam: {FC:37,WP:20,CN:86},
+  sandyClay: {FC:35,WP:22,CN:86}, siltyClay:{FC:40,WP:27,CN:88},
+  clay:      {FC:42,WP:29,CN:88}
+};
+
+
+// ═══════════════  Kc EDITOR  ══════════════════════
+
+let kc = { ki:.30, km:1.20, ke:.60, li:30, ld:40, lm:50, ll:30 };
+
+const PL=38, PR=14, PT=26, PB=34;
+let _PW=450, _PH=120;
+const KC_MAX=1.5, KC_MIN=0.05, L_MIN=5;
+
+const kcTotal = () => kc.li + kc.ld + kc.lm + kc.ll;
+const px  = d => PL + (d / kcTotal()) * _PW;
+const py  = k => PT + _PH - (k / KC_MAX) * _PH;
+const xToDay = x => ((x - PL) / _PW) * kcTotal();
+const yToKc  = y => Math.max(KC_MIN, Math.min(KC_MAX, ((PT+_PH-y)/_PH)*KC_MAX));
+function clamp(v,lo,hi){ return Math.max(lo,Math.min(hi,v)); }
+
+function hPos(i){
+  const {ki,km,ke,li,ld,lm,ll}=kc, tot=li+ld+lm+ll;
+  return [[0,ki],[li,ki],[li+ld,km],[li+ld+lm,km],[tot,ke]][i];
+}
+const H_XLOCK=[true,false,false,false,false];  // H4 unlocked: drag right/left = season length
+const H_YLOCK=[false,true,false,true,false];
+
+function drawKc(){
+  const svg=document.getElementById('kcSvg');
+  const rect=svg.getBoundingClientRect();
+  const W=Math.max(200,Math.round(rect.width));
+  const H=Math.max(120,Math.round(rect.height));
+  svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
+  _PW=W-PL-PR; _PH=H-PT-PB;
+
+  const {ki,km,ke,li,ld,lm,ll}=kc, tot=kcTotal();
+
+  const stageDefs=[
+    {from:0,       to:li,       fill:'rgba(219,234,254,0.45)',label:'Initial'},
+    {from:li,      to:li+ld,    fill:'rgba(220,252,231,0.55)',label:'Dev.'},
+    {from:li+ld,   to:li+ld+lm, fill:'rgba(187,247,208,0.55)',label:'Mid'},
+    {from:li+ld+lm,to:tot,      fill:'rgba(254,243,199,0.55)',label:'Late'},
+  ];
+  const stageBg=stageDefs.map(s=>{
+    const x1=px(s.from),w=px(s.to)-x1,mx=(px(s.from)+px(s.to))/2;
+    return `<rect x="${x1.toFixed(1)}" y="${PT}" width="${w.toFixed(1)}" height="${_PH}" fill="${s.fill}"/>
+      <text x="${mx.toFixed(1)}" y="${PT-7}" font-size="13" fill="#94a3b8" text-anchor="middle" font-family="system-ui,sans-serif">${s.label}</text>`;
+  }).join('');
+
+  const divLines=[li,li+ld,li+ld+lm].map(d=>{
+    const dx=px(d).toFixed(1);
+    return `<line x1="${dx}" y1="${PT}" x2="${dx}" y2="${PT+_PH}" stroke="#e2e8f0" stroke-width="1"/>`;
+  }).join('');
+
+  const gridLines=[1.0,0.5].map(k=>{
+    const gy=py(k).toFixed(1);
+    return `<line x1="${PL}" y1="${gy}" x2="${W-PR}" y2="${gy}" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="${PL-4}" y="${+gy+4}" font-size="13" fill="#94a3b8" text-anchor="end" font-family="system-ui,sans-serif">${k.toFixed(1)}</text>`;
+  }).join('');
+
+  const axes=`<line x1="${PL}" y1="${PT}" x2="${PL}" y2="${PT+_PH}" stroke="#cbd5e1" stroke-width="1.5"/>
+    <line x1="${PL}" y1="${PT+_PH}" x2="${W-PR}" y2="${PT+_PH}" stroke="#cbd5e1" stroke-width="1.5"/>`;
+
+  const pts=[[0,ki],[li,ki],[li+ld,km],[li+ld+lm,km],[tot,ke]];
+  const pStr=pts.map(([d,k])=>`${px(d).toFixed(1)},${py(k).toFixed(1)}`).join(' ');
+  const fillPts=`${PL},${PT+_PH} ${pStr} ${px(tot).toFixed(1)},${PT+_PH}`;
+  const curve=`<polygon points="${fillPts}" fill="rgba(22,163,74,0.08)"/>
+    <polyline points="${pStr}" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linejoin="round"/>`;
+
+  const handles=[0,1,2,3,4].map(i=>{
+    const [d,k]=hPos(i);
+    const hx=px(d).toFixed(1),hy=py(k).toFixed(1);
+    const cur=H_XLOCK[i]?'ns-resize':H_YLOCK[i]?'ew-resize':'move';
+    let kcLabel='',dayLabel='';
+    if(i===0) kcLabel=`<text x="${hx}" y="${+hy-12}" font-size="12" fill="#16a34a" font-weight="700" text-anchor="middle" font-family="system-ui,sans-serif">${ki.toFixed(2)}</text>`;
+    if(i===2) kcLabel=`<text x="${hx}" y="${+hy-12}" font-size="12" fill="#16a34a" font-weight="700" text-anchor="middle" font-family="system-ui,sans-serif">${km.toFixed(2)}</text>`;
+    if(i===4) kcLabel=`<text x="${hx}" y="${+hy-12}" font-size="12" fill="#16a34a" font-weight="700" text-anchor="middle" font-family="system-ui,sans-serif">${ke.toFixed(2)}</text>`;
+    if(i===1||i===2||i===3){
+      const dayVal=[li,li+ld,li+ld+lm][i-1];
+      dayLabel=`<text x="${hx}" y="${PT+_PH+16}" font-size="12" fill="#94a3b8" text-anchor="middle" font-family="system-ui,sans-serif">d${dayVal}</text>`;
+    }
+    return `${kcLabel}${dayLabel}
+      <circle cx="${hx}" cy="${hy}" r="8" fill="white" stroke="#16a34a" stroke-width="2.5"
+        class="kch" data-i="${i}" style="cursor:${cur}"/>`;
+  }).join('');
+
+  svg.innerHTML=stageBg+divLines+gridLines+axes+curve+handles;
+  svg.querySelectorAll('.kch').forEach(el=>el.addEventListener('pointerdown',kcPointerDown));
+
+  // Build label: "150 days  ·  Sep 27, 2026"
+  const plantStr = document.getElementById('plantingDate').value;
+  let harvestLabel = `${tot} days`;
+  if(plantStr){
+    const harv = new Date(plantStr+'T00:00:00');
+    harv.setDate(harv.getDate()+tot);
+    harvestLabel += `  ·  ${harv.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`;
+  }
+  document.getElementById('kcTotalLabel').textContent = harvestLabel;
+}
+
+let kcDragIdx=null;
+function kcPointerDown(e){
+  e.preventDefault();
+  kcDragIdx=parseInt(e.currentTarget.dataset.i);
+  document.getElementById('kcSvg').setPointerCapture(e.pointerId);
+}
+function svgCoords(e){
+  const r=document.getElementById('kcSvg').getBoundingClientRect();
+  return{x:e.clientX-r.left, y:e.clientY-r.top};
+}
+function kcPointerMove(e){
+  if(kcDragIdx===null) return;
+  e.preventDefault();
+  const{x,y}=svgCoords(e);
+  const{li,ld,lm,ll}=kc;
+  switch(kcDragIdx){
+    case 0: kc.ki=+yToKc(y).toFixed(2); break;
+    case 1:{ const h2=li+ld; const nl=clamp(Math.round(xToDay(x)),L_MIN,h2-L_MIN); kc.li=nl; kc.ld=h2-nl; break; }
+    case 2:{ const h1=li,h3=li+ld+lm; const nh2=clamp(Math.round(xToDay(x)),h1+L_MIN,h3-L_MIN); kc.ld=nh2-li; kc.lm=h3-nh2; kc.km=+yToKc(y).toFixed(2); break; }
+    case 3:{ const h2=li+ld,h4=li+ld+lm+ll; const nh3=clamp(Math.round(xToDay(x)),h2+L_MIN,h4-L_MIN); kc.lm=nh3-li-ld; kc.ll=h4-nh3; break; }
+    case 4: {
+      // X: resize late season (extends/shrinks total season length)
+      const h3day = kc.li + kc.ld + kc.lm;
+      const newTot = clamp(Math.round(xToDay(x)), h3day + L_MIN, 365);
+      kc.ll = newTot - h3day;
+      // Y: Kc end value
+      kc.ke = +yToKc(y).toFixed(2);
+      break;
+    }
+  }
+  drawKc();
+  debouncedRecompute();
+}
+
+
+// ═══════════════  RAIN OVERRIDES  ═════════════════
+// Keyed by date string "YYYY-MM-DD", value in inches.
+// Persisted via window.storage across sessions.
+
+let rainOverrides = {};
+
+async function loadRainOverrides(){
+  try {
+    const r = await window.storage.get('rain-overrides');
+    rainOverrides = JSON.parse(r.value);
+  } catch(e) {
+    rainOverrides = {};
+  }
+}
+
+async function saveRainOverrides(){
+  try {
+    await window.storage.set('rain-overrides', JSON.stringify(rainOverrides));
+  } catch(e) {
+    console.warn('Could not save rain overrides:', e);
+  }
+}
+
+// Click handler on observed rain cells
+function editRain(cell){
+  if(cell.querySelector('input')) return; // already editing
+  const ds   = cell.dataset.ds;
+  const meso = parseFloat(cell.dataset.meso) || 0;
+  const cur  = rainOverrides[ds] !== undefined ? rainOverrides[ds] : meso;
+
+  const inp = document.createElement('input');
+  inp.type='number'; inp.className='rain-input';
+  inp.value=cur.toFixed(2); inp.min=0; inp.step=0.01;
+  cell.textContent='';
+  cell.appendChild(inp);
+  inp.focus(); inp.select();
+
+  function commit(){
+    const val=parseFloat(inp.value);
+    if(!isNaN(val) && val>=0){
+      // If within 0.001 of the Mesonet value, remove override (restore Mesonet)
+      if(Math.abs(val-meso)<0.001) delete rainOverrides[ds];
+      else rainOverrides[ds]=+val.toFixed(3);
+    } else {
+      delete rainOverrides[ds]; // empty → restore Mesonet
+    }
+    saveRainOverrides();
+    recompute();
+  }
+
+  inp.addEventListener('blur',   commit);
+  inp.addEventListener('keydown',e=>{
+    if(e.key==='Enter'){ e.preventDefault(); inp.blur(); }
+    if(e.key==='Escape'){ e.preventDefault(); recompute(); } // cancel
+  });
+}
+
+
+// ═══════════════  INIT  ════════════════════════════
+
+let stationLats = {...STATION_LATS};
+
+window.addEventListener('DOMContentLoaded', async () => {
+  // Load persisted rain overrides
+  await loadRainOverrides();
+
+  // Try live station list from Mesonet
+  try {
+    const r = await fetch('https://mesonet.k-state.edu/rest/stationnames/');
+    if(r.ok){
+      const fetched={};
+      (await r.text()).trim().split('\n').slice(1).forEach(l=>{
+        const p=l.split(',');
+        if(p.length>=4){const n=p[0].trim(),la=parseFloat(p[2]);if(n&&!isNaN(la))fetched[n]=la;}
+      });
+      if(Object.keys(fetched).length>10) stationLats=fetched;
+    }
+  } catch(e){}
+
+  const sel=document.getElementById('station');
+  Object.keys(stationLats).sort().forEach(n=>{
+    const o=document.createElement('option');
+    o.value=o.textContent=n;
+    if(n==='Manhattan') o.selected=true;
+    sel.appendChild(o);
+  });
+  onCropChange();  // sets planting date + Kc defaults for initial crop
+  updateRevDisplay();
+
+  // Station change: mark cache stale (silently)
+  sel.addEventListener('change',()=>{ wxCache.station=null; });
+
+  // Numeric inputs: debounced recompute + rev time update
+  ['rootDepth','initWater','fieldArea','pumpGPM','sprinkEff','appDepthCustom']
+    .forEach(id=>document.getElementById(id).addEventListener('input',()=>{updateRevDisplay();debouncedRecompute();}));
+  document.getElementById('plantingDate').addEventListener('input',()=>{
+    wxCache.station=null;  // planting date shift may uncover unfetched dates
+    drawKc();
+    debouncedRecompute();
+  });
+
+  // Selects: immediate recompute
+  ['soilType','appDepth'].forEach(id=>
+    document.getElementById(id).addEventListener('change',()=>recompute()));
+
+  // Radios: immediate recompute
+  document.querySelectorAll('input[name="rdMode"]')
+    .forEach(r=>r.addEventListener('change',()=>recompute()));
+  document.querySelectorAll('input[name="irrMode"]')
+    .forEach(r=>r.addEventListener('change',()=>{onIrrMode();recompute();}));
+
+  // Kc SVG
+  const kcSvg=document.getElementById('kcSvg');
+  kcSvg.addEventListener('pointermove',kcPointerMove);
+  kcSvg.addEventListener('pointerup',   ()=>{kcDragIdx=null;});
+  kcSvg.addEventListener('pointercancel',()=>{kcDragIdx=null;});
+  new ResizeObserver(()=>drawKc()).observe(kcSvg);
+
+  // Rain cell editing — event delegation on tbody
+  document.getElementById('tbody').addEventListener('click',e=>{
+    const cell=e.target.closest('td.rain-cell');
+    if(cell) editRain(cell);
+  });
+});
+
+function onCropChange(){
+  const cropKey = document.getElementById('crop').value;
+  const c = CROPS[cropKey];
+  document.getElementById('rootDepth').value = c.root;
+  kc = {ki:c.Kc_ini,km:c.Kc_mid,ke:c.Kc_end,
+        li:c.stages[0],ld:c.stages[1],lm:c.stages[2],ll:c.stages[3]};
+
+  // Set crop-specific default planting date, keeping the current year
+  // For winter wheat (fall planting), use the current year if we're before Oct,
+  // otherwise use the current year as-is (farmer can adjust)
+  const now = new Date();
+  const yr  = now.getFullYear();
+  document.getElementById('plantingDate').value = `${yr}-${c.plantDate}`;
+
+  wxCache.station = null;  // new planting date → refresh weather
+  drawKc();
+  debouncedRecompute();
+}
+function onIrrMode(){
+  const mode=document.querySelector('input[name="irrMode"]:checked').value;
+  const showDepth = mode==='fixed'||mode==='refill';
+  document.getElementById('fixedDepthWrap').style.display=showDepth?'':'none';
+  document.getElementById('customDepthWrap').style.display='none';
+  document.getElementById('madWrap').style.display=(mode==='fixed'||mode==='refill')?'':'none';
+  updateRevDisplay();
+  recompute();
+}
+function onAppDepth(){
+  document.getElementById('customDepthWrap').style.display=
+    document.getElementById('appDepth').value==='custom'?'':'none';
+  updateRevDisplay();
+}
+function updateRevDisplay(){
+  const area  = parseFloat(document.getElementById('fieldArea').value)||125;
+  const gpm   = parseFloat(document.getElementById('pumpGPM').value)||800;
+  const eff   = (parseFloat(document.getElementById('sprinkEff').value)||85)/100;
+  const adRaw = document.getElementById('appDepth').value;
+  const appD  = adRaw==='custom'?(parseFloat(document.getElementById('appDepthCustom').value)||1):parseFloat(adRaw);
+  const revD  = (area*appD*27154)/(gpm*eff*60*24);
+  const el    = document.getElementById('revTimeDisplay');
+  if(el) el.textContent = `Revolution time: ${revD.toFixed(1)} days at current settings`;
+}
+function setMAD(pct){
+  document.getElementById('mad').value=pct;
+  [30,40,50,60,70].forEach(p=>document.getElementById('mad'+p).classList.toggle('on',p===pct));
+  recompute();
+}
+
+function resetAllRain(){
+  rainOverrides={};
+  saveRainOverrides();
+  recompute();
+}
+
+
+// ═══════════════  PHYSICS  ════════════════════════
+
+function doy(d){ return Math.floor((d-new Date(d.getFullYear(),0,0))/86400000); }
+
+function getRA(lat,day){
+  const phi=lat*Math.PI/180,dr=1+.033*Math.cos(2*Math.PI*day/365);
+  const del=.409*Math.sin(2*Math.PI*day/365-1.39);
+  const ws=Math.acos(Math.max(-1,Math.min(1,-Math.tan(phi)*Math.tan(del))));
+  return (24*60/Math.PI)*.082*dr*(ws*Math.sin(phi)*Math.sin(del)+Math.cos(phi)*Math.cos(del)*Math.sin(ws));
+}
+
+function hargreaves(Tmax,Tmin,lat,day){
+  return Math.max(0,.0023*getRA(lat,day)*Math.sqrt(Math.max(.5,Tmax-Tmin))*((Tmax+Tmin)/2+17.8)/25.4);
+}
+
+function getKc(i){
+  const {ki,km,ke,li,ld,lm,ll}=kc, d=Math.min(i,li+ld+lm+ll-1);
+  if(d<li)          return ki;
+  if(d<li+ld)       return ki+((d-li)/ld)*(km-ki);
+  if(d<li+ld+lm)    return km;
+  return km+((d-li-ld-lm)/ll)*(ke-km);
+}
+
+function getZ(i,crop,Zm,dynamic){
+  if(!dynamic) return Zm;
+  const [Li,Ld]=crop.stages, Zi=8;
+  if(i<Li) return Zi;
+  if(i<Li+Ld) return Zi+((i-Li)/Ld)*(Zm-Zi);
+  return Zm;
+}
+
+function runoff(P,CN){ const S=1000/CN-10,Ia=.2*S; return P<=Ia?0:(P-Ia)*(P-Ia)/(P-Ia+S); }
+function pivDays(A,d,Q,E){ return (A*d*27154)/(Q*E*60*24); }
+
+// OLS model: ETo (mm/day) = -0.9848 + 0.1201·srad + 2.2454·vpd + 0.2264·wspd → converted to in/day
+// srad: MJ/m²/day (SR) · vpd: kPa (VPDEFAVG) · wspd: m/s (WSPD2MAVG)
+function olsETo(srad, vpd, wspd){
+  const s = (isNaN(srad)||srad<0) ? null : srad;
+  const v = (isNaN(vpd) ||vpd <0) ? null : vpd;
+  const w = (isNaN(wspd)||wspd<0) ? 2.0  : wspd;  // 2 m/s default
+  if(s===null||v===null) return null;
+  return Math.max(0, -0.9848 + 0.1201*s + 2.2454*v + 0.2264*w)/25.4;
+}
+
+// DOY-based climatology lookup (0-indexed into eto_state, in/day)
+function doyETo(date){ return eto_state[Math.min(doy(date)-1, eto_state.length-1)]; }
+
+// 7-day rolling ETo — OLS when data complete, Hargreaves as fallback
+function computeRollingETo(wx,today,lat){
+  const vals=[];
+  for(let d=1;d<=7;d++){
+    const dt=new Date(today); dt.setDate(dt.getDate()-d);
+    const ds=dt.toISOString().split('T')[0];
+    const w=wx[ds];
+    if(w){
+      const e = olsETo(w.srad,w.vpd,w.wspd) ?? hargreaves(w.tmax,w.tmin,lat,doy(dt));
+      if(e>0&&e<0.5) vals.push(e);
+    }
+  }
+  return vals.length>=2 ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
+}
+
+
+// ═══════════════  MESONET  ════════════════════════
+
+function parseCSV(txt){
+  const lines=txt.trim().split('\n'); if(lines.length<2) return [];
+  const hdrs=lines[0].split(',').map(h=>h.trim());
+  return lines.slice(1).map(l=>{const v=l.split(','),o={};hdrs.forEach((h,i)=>o[h]=(v[i]||'').trim());return o;});
+}
+function ts2ds(ts){
+  ts=(ts||'').trim();
+  if(ts.length>=10&&ts[4]==='-') return ts.slice(0,10);
+  if(ts.length>=8) return `${ts.slice(0,4)}-${ts.slice(4,6)}-${ts.slice(6,8)}`;
+  return null;
+}
+function mesoFmt(d){const p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}000000`;}
+
+
+// ═══════════════  SIMULATION  ═════════════════════
+
+let cTop=null, cBot=null, tableData=[];
+let wxCache={station:null,wx:{}};
+let hasResults=false;
+
+function debounce(fn,ms){ let t; return(...args)=>{clearTimeout(t);t=setTimeout(()=>fn(...args),ms);}; }
+const debouncedRecompute=debounce(()=>recompute(),400);
+
+async function generateSchedule(){
+  const station=document.getElementById('station').value;
+  const plantStr=document.getElementById('plantingDate').value;
+  if(!plantStr){alert('Please enter a planting date.');return;}
+  if(station!==wxCache.station){
+    const nDays=kcTotal(), t0=new Date(plantStr+'T00:00:00');
+    const tEnd=new Date(t0); tEnd.setDate(tEnd.getDate()+nDays-1);
+    const today=new Date(); today.setHours(0,0,0,0);
+    const fetchEnd=today<tEnd?today:tEnd;
+    const newWx={};
+
+    if(t0<=fetchEnd){
+      const url=`https://mesonet.k-state.edu/rest/stationdata/?stn=${encodeURIComponent(station)}`
+        +`&int=day&t_start=${mesoFmt(t0)}&t_end=${mesoFmt(fetchEnd)}&vars=TEMP2MMAX,TEMP2MMIN,PRECIP,SR,VPDEFAVG,WSPD2MAVG`;
+      try{
+        const resp=await fetch(url);
+        if(resp.ok){
+          let n=0;
+          parseCSV(await resp.text()).forEach(row=>{
+            const ds=ts2ds(row['TIMESTAMP']||'');if(!ds) return;
+            const tmx=parseFloat(row['TEMP2MMAX']),tmn=parseFloat(row['TEMP2MMIN']),pr=parseFloat(row['PRECIP']);
+            if(isNaN(tmx)||tmx<-40||tmx>55) return;
+            const srad=parseFloat(row['SR']);
+            const vpd =parseFloat(row['VPDEFAVG']);
+            const wspd=parseFloat(row['WSPD2MAVG']);
+            newWx[ds]={
+              tmax:tmx, tmin:tmn,
+              p:isNaN(pr)||pr<0?0:pr/25.4,
+              srad:isNaN(srad)||srad<0?NaN:srad,
+              vpd :isNaN(vpd) ||vpd <0?NaN:vpd,
+              wspd:isNaN(wspd)||wspd<0?NaN:wspd
+            };
+            n++;
+          });
+          console.log(`Loaded ${n} days from ${station}.`);
+        }
+      } catch(e){ console.warn('Mesonet fetch error:', e.message); }
+    }
+    wxCache={station,wx:newWx};
+  }
+
+  runSim();
+  if(!hasResults){
+    document.getElementById('results').scrollIntoView({behavior:'smooth'});
+    hasResults=true;
+  }
+}
+
+function recompute(){ if(!hasResults) return; runSim(); }
+
+function runSim(){
+  const station  =document.getElementById('station').value;
+  const cropKey  =document.getElementById('crop').value;
+  const soilKey  =document.getElementById('soilType').value;
+  const plantStr =document.getElementById('plantingDate').value;
+  if(!plantStr) return;
+
+  const nDays   =kcTotal();
+  const Zm      =parseFloat(document.getElementById('rootDepth').value)||48;
+  const dynamic =document.querySelector('input[name="rdMode"]:checked').value==='dynamic';
+  const initRaw  = parseFloat(document.getElementById('initWater').value);
+  const initPct  = (isNaN(initRaw) ? 75 : initRaw) / 100;
+  const area    =parseFloat(document.getElementById('fieldArea').value)||125;
+  const gpm     =parseFloat(document.getElementById('pumpGPM').value)||800;
+  const eff     =(parseFloat(document.getElementById('sprinkEff').value)||85)/100;
+  const adRaw   =document.getElementById('appDepth').value;
+  const fixedD  =adRaw==='custom'?(parseFloat(document.getElementById('appDepthCustom').value)||1):parseFloat(adRaw);
+  const irrMode =document.querySelector('input[name="irrMode"]:checked').value;
+  const mad     =parseFloat(document.getElementById('mad').value)/100;
+
+  const crop=CROPS[cropKey], soil=SOILS[soilKey], lat=stationLats[station]||38.8;
+  const t0=new Date(plantStr+'T00:00:00');
+  const today=new Date(); today.setHours(0,0,0,0);
+  const wx=wxCache.wx;
+
+  // 7-day rolling ETo for forecast days (blended 70% rolling / 30% climatology)
+  const rollingE=computeRollingETo(wx,today,lat);
+
+  tableData=[];
+  const Z0=getZ(0,crop,Zm,dynamic);
+  let S=(soil.WP*Z0/100)+initPct*(soil.FC*Z0/100-soil.WP*Z0/100);
+  let busy=false,busyEnd=-1,totalNet=0;
+
+  for(let i=0;i<nDays;i++){
+    const date=new Date(t0); date.setDate(date.getDate()+i);
+    const ds=date.toISOString().split('T')[0], fut=date>today;
+
+    const Zprev=i>0?getZ(i-1,crop,Zm,dynamic):Z0, Zcur=getZ(i,crop,Zm,dynamic);
+    if(Zcur>Zprev) S+=(Zcur-Zprev)*soil.FC/100;
+
+    const FC_in=soil.FC*Zcur/100, WP_in=soil.WP*Zcur/100;
+    const PAW=FC_in-WP_in, Thr=WP_in+(1-mad)*PAW;
+    S=Math.min(S,FC_in);
+
+    const w=wx[ds];
+    let ETo,precip,mesoP,src;
+
+    if(!fut&&w){
+      ETo = olsETo(w.srad,w.vpd,w.wspd) ?? hargreaves(w.tmax,w.tmin,lat,doy(date));
+      mesoP=w.p;
+      const override=rainOverrides[ds];
+      if(override!==undefined){precip=override;src='field';}
+      else{precip=mesoP;src='obs';}
+    } else {
+      // Forecast: rolling blend with DOY climatology (replaces monthly ETO_MON)
+      const clim = doyETo(date);
+      ETo = rollingE!=null ? Math.min(0.45, 0.7*rollingE+0.3*clim) : clim;
+      mesoP=0; precip=0; src='est';
+    }
+
+    const Kc=getKc(i);
+    const Ks=S<Thr?Math.max(0,(S-WP_in)/(Thr-WP_in+1e-9)):1;
+    const ETc=ETo*Kc*Ks;
+    const R=runoff(precip,soil.CN);
+
+    if(busy&&i>=busyEnd) busy=false;
+
+    const FAWpre=Math.max(0,Math.min(1,(S-WP_in)/(PAW+1e-9)));
+    let irr=0,pivT=0,rowSt='',rCls='',tCls='';
+
+    if(irrMode==='fixed'||irrMode==='refill'){
+      if(!busy&&FAWpre<=(1-mad)){
+        irr=irrMode==='refill'?Math.max(0,FC_in-S):fixedD;
+        if(irr>0){pivT=pivDays(area,irr,gpm,eff);busy=true;busyEnd=i+Math.ceil(pivT);totalNet+=irr;}
+        rowSt='▶ Irrigate';rCls='r-irr';tCls='tag-irr';
+      } else if(busy){
+        // Pivot is running — but check if soil also dropped below threshold
+        if(FAWpre<(1-mad)){
+          rowSt=`⚠ Stress`;rCls='r-str';tCls='tag-str';
+        } else {
+          rowSt=`↻ ${busyEnd-i}d left`;rCls='r-run';tCls='tag-run';
+        }
+      } else if(FAWpre<(1-mad)){
+        rowSt='⚠ Stress';rCls='r-str';tCls='tag-str';
+      } else {
+        rowSt='✓ OK';rCls='';tCls='tag-ok';
+      }
+    } else {
+      if(FAWpre<(1-mad)){rowSt='⚠ Stress';rCls='r-str';tCls='tag-str';}
+      else              {rowSt='✓ OK';rCls='';tCls='tag-ok';}
+    }
+
+    S=S+(precip-R)+irr-ETc;
+    S=Math.min(FC_in,Math.max(0,S));
+    const FAW=Math.max(0,Math.min(1,(S-WP_in)/(PAW+1e-9)));
+
+    tableData.push({i,ds,fut,src,precip,mesoP,ETo,Kc,Ks,ETc,R,irr,pivT,
+      Z:Zcur,FC_in,WP_in,PAW,Thr_in:Thr,S,FAW,rowSt,rCls,tCls,eff});
+  }
+
+  renderSummary(area,eff,totalNet,irrMode);
+  renderTable(irrMode,mad);
+  renderCharts(mad);
+  checkStressAlert();
+
+  // Reset AI panel so next open fetches fresh analysis
+  const aiText = document.getElementById('aiText');
+  if(aiText) aiText.textContent='';
+
+  document.getElementById('results').style.display='block';
+  const modeLabel = irrMode==='none'   ? 'No irrigation'
+    : irrMode==='refill' ? 'Refill to FC'
+    : `MAD ${Math.round(mad*100)}%`;
+  document.getElementById('resultsTitle').textContent=
+    `${crop.name} · ${station} · ${t0.getFullYear()} · ${modeLabel}`;
+}
+
+
+// ═══════════════  RENDER  ═════════════════════════
+function renderSummary(area,eff,totalNet,irrMode){
+  const totP    = tableData.reduce((a,r)=>a+r.precip,0);
+  const totET   = tableData.reduce((a,r)=>a+r.ETc,0);
+  const irrEv   = tableData.filter(r=>r.irr>0).length;
+  const grossAF = (totalNet*area/12)/eff;
+  const editCount = tableData.filter(r=>r.src==='field').length;
+
+  const items = [
+    {v:totP.toFixed(1)+' in',        l:'Rainfall'},
+    {v:totET.toFixed(1)+' in',       l:'Crop Water Use'},
+  ];
+  if(irrMode!=='none'){
+    items.push({v:totalNet.toFixed(1)+' in', l:'Net Irrigation'});
+    items.push({v:Math.round(grossAF)+' ac-ft', l:'Gross Pumped'});
+    items.push({v:irrEv,                        l:'Pivot Starts'});
+  }
+  if(editCount>0){
+    items.push({v:editCount, l:'Rain Edits', cls:'ok'});
+  }
+
+  document.getElementById('summaryStats').innerHTML=items.map(it=>
+    `<div class="sitem"><div class="sval ${it.cls||''}">${it.v}</div><div class="slbl">${it.l}</div></div>`
+  ).join('');
+
+  const rbtn=document.getElementById('resetRainBtn');
+  if(rbtn) rbtn.style.display=editCount>0?'':'none';
+}
+
+function renderTable(irrMode,mad){
+  document.getElementById('schedTable').className='';
+  const gh=document.getElementById('grossHeader');
+  if(irrMode==='none')        gh.textContent='';
+  else if(irrMode==='refill') gh.textContent='Applied (in)';
+  else                        gh.textContent='Gross (in)';
+
+  const madFAW=1-mad;
+  document.getElementById('tbody').innerHTML=tableData.map(r=>{
+    const rowCls=[r.rCls,r.fut?'fut':'obs'].join(' ').trim();
+
+    // Gradient TAW bar: red→yellow→green, revealed left-to-right as soil fills
+    const pct = Math.round(r.FAW*100);
+    const txtColor = r.fut ? '#b0bec5' : r.FAW >= madFAW ? 'var(--g)' : 'var(--red)';
+    const favCell = r.fut
+      ? `<div style="display:inline-flex;align-items:center;gap:5px;">
+          <div style="width:38px;height:8px;background:#e2e8f0;border-radius:3px;overflow:hidden;">
+            <div style="width:${pct}%;height:100%;background:#cbd5e1;border-radius:3px;"></div>
+          </div>
+          <span style="font-size:12px;color:#b0bec5;">${pct}%</span>
+        </div>`
+      : `<div style="display:inline-flex;align-items:center;gap:5px;">
+          <div style="width:38px;height:8px;background:#e2e8f0;border-radius:3px;overflow:hidden;position:relative;">
+            <div style="position:absolute;left:0;top:0;width:100%;height:100%;
+              background:linear-gradient(to right,#6565f3 100%);
+              clip-path:inset(0 ${100-pct}% 0 0);border-radius:3px;"></div>
+          </div>
+          <span style="font-size:12px;font-weight:600;color:${txtColor};">${pct}%</span>
+        </div>`;
+
+    // Rain cell — editable for observed days only
+    const isEdited = r.src==='field';
+    const rainDisp = r.precip>0 ? r.precip.toFixed(2) : '—';
+    const rainCell = !r.fut
+      ? `<td class="rain-cell${isEdited?' rain-edited':''}" data-ds="${r.ds}" data-meso="${r.mesoP.toFixed(3)}">${rainDisp}</td>`
+      : `<td>${rainDisp}</td>`;
+
+    let grossCell='—';
+    if(irrMode!=='none'&&r.irr>0) grossCell=`<strong>${irrMode==='refill'?r.irr.toFixed(2):(r.irr/r.eff).toFixed(2)}</strong>`;
+    else if(r.rCls==='r-run') grossCell='↻';
+
+    return `<tr class="${rowCls}">
+      <td style="color:var(--mut)">${r.i+1}</td>
+      <td class="tl">${r.ds}</td>
+      ${rainCell}
+      <td>${r.ETo.toFixed(3)}</td>
+      <td>${r.Kc.toFixed(2)}</td>
+      <td>${r.ETc.toFixed(3)}</td>
+      <td>${r.S.toFixed(2)}</td>
+      <td>${favCell}</td>
+      <td>${grossCell}</td>
+      <td><span class="tag ${r.tCls}">${r.rowSt}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+// Chart view mode: 'storage' or 'depletion'
+let chartMode = 'depletion';
+
+function toggleChartMode(mode){
+  chartMode = mode;
+  document.getElementById('btnStorage').classList.toggle('on',   mode==='storage');
+  document.getElementById('btnDepletion').classList.toggle('on', mode==='depletion');
+  if(hasResults){
+    const mad = parseFloat(document.getElementById('mad').value)/100;
+    renderCharts(mad);
+  }
+}
+
+function lineLegend(){
+  return{font:{size:12},padding:14,usePointStyle:true,pointStyleWidth:28,
+    generateLabels(chart){
+      return Chart.defaults.plugins.legend.labels.generateLabels(chart)
+        .filter(item=>!chart.data.datasets[item.datasetIndex].label.startsWith('_'))
+        .map(item=>{item.pointStyle='line';return item;});
+    }};
+}
+
+function renderCharts(mad){
+  const labels   = tableData.map(r=>r.ds);
+  const madLabel = `${Math.round(mad*100)}% MAD`;
+
+  // Index of today in the dataset (for the vertical "today" marker)
+  const todayStr = new Date().toISOString().split('T')[0];
+  const todayIdx = labels.indexOf(todayStr);
+
+  // Inline plugin: draws a full-height vertical dashed line at today
+  const todayPlugin = {
+    id: 'todayLine',
+    afterDraw(chart){
+      if(todayIdx < 0) return;
+      const {ctx, scales:{x, y}} = chart;
+      const xPos = x.getPixelForValue(todayIdx);
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(xPos, y.top);
+      ctx.lineTo(xPos, y.bottom);
+      ctx.strokeStyle = 'rgba(71,85,105,0.85)';
+      ctx.lineWidth   = 2;
+      ctx.setLineDash([5,4]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle  = '#475569';
+      ctx.font       = 'bold 11px system-ui,sans-serif';
+      ctx.textAlign  = 'center';
+      ctx.fillText('Today', xPos, y.top - 5);
+      ctx.restore();
+    }
+  };
+
+  // ── Precompute both views from existing tableData ──
+  const fc    = tableData.map(r=>+r.FC_in.toFixed(3));
+  const wp    = tableData.map(r=>+r.WP_in.toFixed(3));
+  const thr   = tableData.map(r=>+r.Thr_in.toFixed(3));
+  const sw    = tableData.map(r=>+r.S.toFixed(3));
+  const dep   = tableData.map(r=>+(r.FC_in-r.S).toFixed(3));
+  const madDep= tableData.map(r=>+(mad*r.PAW).toFixed(3));
+  const paw   = tableData.map(r=>+r.PAW.toFixed(3));
+
+  if(cTop) cTop.destroy();
+
+  if(chartMode==='storage'){
+    // ── Storage view: 0 at bottom, FC at top ──
+    cTop=new Chart(document.getElementById('chartTop').getContext('2d'),{
+      type:'line',
+      data:{labels,datasets:[
+        // Zone fills (hidden from legend)
+        {label:'_wp', data:wp,  borderWidth:0,pointRadius:0,tension:0,fill:'origin',  backgroundColor:'rgba(255,255,255,0)'},
+        {label:'_str',data:thr, borderWidth:0,pointRadius:0,tension:0,fill:{target:0},backgroundColor:'rgba(220,38,38,0.13)'},
+        {label:'_ok', data:fc,  borderWidth:0,pointRadius:0,tension:0,fill:{target:1},backgroundColor:'rgba(22,163,74,0.10)'},
+        // Data line
+        {label:'Storage (in)',  data:sw,  borderColor:'#1d4ed8',fill:false,borderWidth:2.5,pointRadius:0,tension:.25},
+        // Reference lines
+        {label:'Field Capacity',data:fc,  borderColor:'#16a34a',borderDash:[7,4],borderWidth:1.5,pointRadius:0,fill:false,tension:0},
+        {label:madLabel+' threshold', data:thr, borderColor:'#dc2626',borderDash:[5,3],borderWidth:1.5,pointRadius:0,fill:false,tension:0},
+        {label:'Wilting Point', data:wp,  borderColor:'#94a3b8',borderDash:[2,3],borderWidth:1,  pointRadius:0,fill:false,tension:0}
+      ]},
+      options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+        plugins:{
+          legend:{position:'top',labels:lineLegend()},
+          tooltip:{filter:i=>!i.dataset.label.startsWith('_'),
+            callbacks:{label:c=>`${c.dataset.label}: ${(+c.raw).toFixed(2)} in`}}
+        },
+        scales:{x:{display:false},y:{title:{display:true,text:'Soil water storage (in)',font:{size:12}},min:0}}
+      },
+      plugins:[todayPlugin]
+    });
+
+  } else {
+    // ── Depletion view: 0 (full) at top, increasing downward ──
+    // Zone fills work with reversed axis:
+    //   green: between 0 and MAD threshold  (safe, low depletion)
+    //   red:   between MAD threshold and PAW (stress, high depletion)
+    cTop=new Chart(document.getElementById('chartTop').getContext('2d'),{
+      type:'line',
+      data:{labels,datasets:[
+        // Zone fills (hidden from legend)
+        {label:'_zero',data:tableData.map(()=>0),borderWidth:0,pointRadius:0,tension:0,fill:'origin',backgroundColor:'rgba(255,255,255,0)'},
+        {label:'_ok',  data:madDep,borderWidth:0,pointRadius:0,tension:0,fill:{target:0},backgroundColor:'rgba(22,163,74,0.10)'},
+        {label:'_str', data:paw,   borderWidth:0,pointRadius:0,tension:0,fill:{target:1},backgroundColor:'rgba(220,38,38,0.13)'},
+        // Data line
+        {label:'Depletion (in)', data:dep,    borderColor:'#1d4ed8',fill:false,borderWidth:2.5,pointRadius:0,tension:.25},
+        // Reference lines
+        {label:'Field Capacity (0)', data:tableData.map(()=>0), borderColor:'#16a34a',borderDash:[7,4],borderWidth:1.5,pointRadius:0,fill:false,tension:0},
+        {label:madLabel+' trigger',  data:madDep, borderColor:'#dc2626',borderDash:[5,3],borderWidth:1.5,pointRadius:0,fill:false,tension:0},
+        {label:'Wilting Point',      data:paw,    borderColor:'#94a3b8',borderDash:[2,3],borderWidth:1,  pointRadius:0,fill:false,tension:0}
+      ]},
+      options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+        plugins:{
+          legend:{position:'top',labels:lineLegend()},
+          tooltip:{filter:i=>!i.dataset.label.startsWith('_'),
+            callbacks:{label:c=>`${c.dataset.label}: ${(+c.raw).toFixed(2)} in`}}
+        },
+        scales:{
+          x:{display:false},
+          y:{reverse:true,min:0,
+            title:{display:true,text:'Soil water depletion (in)  ←  0 = Full',font:{size:12}}}
+        }
+      },
+      plugins:[todayPlugin]
+    });
+  }
+
+  // ── Bottom bar chart — same for both modes ──
+  const maxPrecip = Math.max(0, ...tableData.map(r=>r.precip));
+  const maxIrr    = Math.max(0, ...tableData.map(r=>r.irr));
+  const yMax      = Math.max(maxPrecip, maxIrr) > 0
+    ? Math.ceil((Math.max(maxPrecip, maxIrr) + 0.25) * 10) / 10
+    : 2;
+
+  if(cBot) cBot.destroy();
+  cBot=new Chart(document.getElementById('chartBot').getContext('2d'),{
+    type:'bar',
+    data:{labels,datasets:[
+      {label:'Precipitation (in)',
+       data:tableData.map(r=>r.precip>0?+r.precip.toFixed(3):null),
+       backgroundColor:'rgba(6,182,212,0.75)',borderColor:'#0891b2',
+       borderWidth:1,borderRadius:2},
+      {label:'Irrigation — net (in)',
+       data:tableData.map(r=>r.irr>0?+r.irr.toFixed(3):null),
+       backgroundColor:'rgba(234,88,12,0.80)',borderColor:'#c2410c',
+       borderWidth:1,borderRadius:2}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{position:'top',labels:{font:{size:12},boxWidth:14,padding:12}},
+        tooltip:{callbacks:{label:c=>c.raw!=null?`${c.dataset.label}: ${(+c.raw).toFixed(2)} in`:null}}},
+      scales:{x:{ticks:{maxTicksLimit:14,font:{size:11},maxRotation:45}},
+        y:{title:{display:true,text:'Depth (in)',font:{size:12}},min:0,max:yMax}}
+    }
+  });
+}
+
+
+// ═══════════════  AI SUMMARY (Claude Haiku 4.5 via DO Serverless)  ═══════════
+
+// DigitalOcean Serverless Function URL — key stays server-side, safe for GitHub Pages
+const FUNCTION_URL = 'https://faas-nyc1-2ef2e6cc.doserverless.co/api/v1/web/fn-6c84a070-b561-4f96-9bf4-e0a8e1afd77b/default/call_irrigation_planner_agent';
+
+// Critical yield-sensitive windows per crop (fraction of total season)
+const CRITICAL_WINDOWS = {
+  corn:        {s:.45, e:.72, label:'tasseling and silking (R1)'},
+  soybean:     {s:.50, e:.80, label:'pod fill (R3–R5)'},
+  sorghum:     {s:.45, e:.72, label:'heading and grain fill'},
+  winterWheat: {s:.44, e:.72, label:'heading and grain fill'},
+  sunflower:   {s:.46, e:.74, label:'head development and grain fill'},
+};
+
+function toggleAIPanel(){
+  if(!FUNCTION_URL){ return; }
+  const panel = document.getElementById('aiPanel');
+  const open  = panel.style.display !== 'none';
+  if(open){ panel.style.display='none'; return; }
+  panel.style.display='';
+  panel.scrollIntoView({behavior:'smooth', block:'nearest'});
+  if(!document.getElementById('aiText').textContent.trim())
+    fetchAISummary();
+}
+
+function checkStressAlert(){
+  if(!hasResults) return;
+  const btn = document.getElementById('btnAI');
+  if(!btn) return;
+  if(!FUNCTION_URL){ btn.style.display='none'; return; }
+  btn.style.display='';
+
+  const cropKey  = document.getElementById('crop').value;
+  const cw       = CRITICAL_WINDOWS[cropKey];
+  const total    = kcTotal();
+  const today    = new Date(); today.setHours(0,0,0,0);
+  const mad_frac = parseFloat(document.getElementById('mad').value)/100;
+
+  const critStress = tableData.filter(r=>{
+    const ahead = (new Date(r.ds+'T00:00:00')-today)/86400000;
+    const frac  = r.i/total;
+    return ahead>=0 && ahead<=14 && r.FAW<(1-mad_frac) && frac>=cw.s && frac<=cw.e;
+  });
+
+  const alert = critStress.length>0;
+  btn.classList.toggle('ai-alert', alert);
+  btn.textContent = alert
+    ? `⚠ AI Summary (${critStress.length} stress alert${critStress.length>1?'s':''})`
+    : '✦ AI Summary';
+}
+
+function buildPrompt(){
+  const cropKey = document.getElementById('crop').value;
+  const station = document.getElementById('station').value;
+  const irrMode = document.querySelector('input[name="irrMode"]:checked').value;
+  const mad     = parseFloat(document.getElementById('mad').value);
+  const soilKey = document.getElementById('soilType').value;
+  const crop    = CROPS[cropKey];
+  const cw      = CRITICAL_WINDOWS[cropKey];
+
+  const totP     = tableData.reduce((a,r)=>a+r.precip,0);
+  const totET    = tableData.reduce((a,r)=>a+r.ETc,0);
+  const totalNet = tableData.reduce((a,r)=>a+r.irr,0);
+  const irrEv    = tableData.filter(r=>r.irr>0).length;
+  const maxETc   = Math.max(...tableData.map(r=>r.ETc));
+
+  const eff  = (parseFloat(document.getElementById('sprinkEff').value)||85)/100;
+  const gpm  = parseFloat(document.getElementById('pumpGPM').value)||800;
+  const area = parseFloat(document.getElementById('fieldArea').value)||125;
+  const adRaw= document.getElementById('appDepth').value;
+  const appD = adRaw==='custom'?(parseFloat(document.getElementById('appDepthCustom').value)||1):parseFloat(adRaw);
+  const revD = (area*appD*27154)/(gpm*eff*60*24);
+  const canKeep = (maxETc>0 ? appD/maxETc : 999) >= revD;
+
+  const today = new Date(); today.setHours(0,0,0,0);
+  const t0    = new Date(tableData[0].ds+'T00:00:00');
+  const dayN  = Math.max(0, Math.floor((today-t0)/86400000));
+  const {li,ld,lm,ll} = kc;
+  const total = li+ld+lm+ll;
+  const stage = dayN<li?'Initial':dayN<li+ld?'Development':dayN<li+ld+lm?'Mid-season':'Late';
+
+  const upcoming = tableData.filter(r=>{
+    const ahead=(new Date(r.ds+'T00:00:00')-today)/86400000;
+    return ahead>=0 && ahead<14;
+  });
+
+  const critStress = upcoming.filter(r=>{
+    const frac=r.i/total;
+    return r.FAW<(1-mad/100) && frac>=cw.s && frac<=cw.e;
+  });
+
+  const upcomingLines = upcoming.map(r=>{
+    const frac=r.i/total;
+    const crit = frac>=cw.s&&frac<=cw.e?' ← CRITICAL STAGE':'';
+    const flag = r.irr>0?' — IRRIGATE':r.FAW<(1-mad/100)?' — STRESS'+crit:'';
+    return `  ${r.ds}  ETo ${r.ETo.toFixed(3)} in  ETc ${r.ETc.toFixed(3)} in  ${(r.FAW*100).toFixed(0)}% avail.${flag}`;
+  }).join('\n')||'  No upcoming data';
+
+  const stressAlert = critStress.length>0
+    ? `⚠ CRITICAL: ${critStress.length} stress day(s) projected during ${cw.label} — the most yield-sensitive period.`
+    : '';
+
+  const irrLabel = {
+    fixed:`MAD-triggered at ${mad}% depletion`,
+    refill:'refill to field capacity',
+    none:'no irrigation (dryland)'
+  }[irrMode]||irrMode;
+
+  return `You are a practical irrigation advisor helping a Kansas farmer using a scheduling tool. Be concise and actionable. Plain language only — no jargon. Maximum 5–6 sentences. Never recommend specific "Days ahead" numbers. Never suggest the farmer change their pump, well, or irrigation hardware — they know their system's limits.
+
+SEASON:
+Crop: ${crop.name} | Station: ${station}, KS | Planting: ${tableData[0].ds}
+Soil: ${soilKey} | Strategy: ${irrLabel}
+Rainfall projected: ${totP.toFixed(1)} in | Crop ET: ${totET.toFixed(1)} in | Net irrigation: ${totalNet.toFixed(1)} in (${irrEv} starts)
+Pivot: ${appD} in/pass, ${revD.toFixed(1)}-day revolution — ${canKeep?'can keep up at peak':'may struggle to keep up at peak demand of '+maxETc.toFixed(3)+' in/day'}
+Growth stages: Initial d0–${li} | Dev d${li}–${li+ld} | Mid d${li+ld}–${li+ld+lm} | Late d${li+ld+lm}–${total}
+Now: Day ${dayN} (${stage}) | Critical window: ${cw.label} (d${Math.round(cw.s*total)}–${Math.round(cw.e*total)})
+
+NEXT 14 DAYS:
+${upcomingLines}
+${stressAlert}
+
+Provide: (1) 2–3 sentence plain-English outlook. (2) ${
+  critStress.length>0
+    ? 'What specific irrigation action the farmer should take right now to reduce stress risk during the critical window.'
+    : !canKeep
+    ? 'Advise on irrigation timing strategy to best manage the peak demand period — focus on scheduling, not on hardware changes.'
+    : 'One practical tip for the coming weeks.'
+}`;
+}
+
+async function fetchAISummary(){
+  if(!FUNCTION_URL) return;
+  const loadEl = document.getElementById('aiLoading');
+  const textEl = document.getElementById('aiText');
+  loadEl.style.display=''; textEl.textContent='';
+
+  try {
+    const res  = await fetch(FUNCTION_URL, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({prompt: buildPrompt()})
+    });
+    const data = await res.json();
+    const text = data.content || data.choices?.[0]?.message?.content || JSON.stringify(data);
+    // Convert **bold** to <strong> and double newlines to paragraphs
+    const html = text
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .split(/\n\n+/)
+      .map(p => `<p>${p.replace(/\n/g,'<br>')}</p>`)
+      .join('');
+    textEl.innerHTML = html;
+  } catch(e){
+    textEl.textContent=`Could not reach AI service: ${e.message}.`;
+  } finally {
+    loadEl.style.display='none';
+  }
+}
+
+
+// ═══════════════  CSV EXPORT  ═════════════════════
+
+function downloadCSV(){
+  const hdr=['Day','Date','Rain_src','Rain_in','Meso_Rain_in','ETo_in','Kc','Ks','ETc_in',
+             'Runoff_in','Irr_net_in','Irr_gross_in','PivotTime_days',
+             'FC_in','WP_in','SoilWater_in','FAW_pct','Status'];
+  const rows=tableData.map(r=>[
+    r.i+1,r.ds,r.src,
+    r.precip.toFixed(2),r.mesoP.toFixed(2),
+    r.ETo.toFixed(3),r.Kc.toFixed(2),r.Ks.toFixed(2),
+    r.ETc.toFixed(3),r.R.toFixed(3),
+    r.irr>0?r.irr.toFixed(2):0, r.irr>0?(r.irr/r.eff).toFixed(2):0,
+    r.irr>0?r.pivT.toFixed(2):0,
+    r.FC_in.toFixed(2),r.WP_in.toFixed(2),
+    r.S.toFixed(3),(r.FAW*100).toFixed(1),
+    r.rowSt.replace(/[▶↻✓⚠]/g,'').trim()
+  ]);
+  Object.assign(document.createElement('a'),{
+    href:URL.createObjectURL(new Blob([[hdr,...rows].map(r=>r.join(',')).join('\n')],{type:'text/csv'})),
+    download:'irrigation_schedule.csv'
+  }).click();
+}
+</script>
+</body>
+</html>
