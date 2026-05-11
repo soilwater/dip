@@ -85,6 +85,14 @@ select:focus,input:focus{outline:none;border-color:var(--g);box-shadow:0 0 0 2px
 .chart-toggle button:last-child{border-right:none;}
 .chart-toggle button.on{background:var(--g);color:#fff;}
 
+/* ── AI Summary panel ── */
+#aiPanel{background:#fafdf7;border-color:var(--gbdr);}
+#aiText{font-size:15px;line-height:1.75;color:var(--txt);}
+#aiText strong{color:var(--txt);font-weight:700;}
+#aiText p{margin-bottom:0.6em;}
+#aiLoading{font-size:14px;color:var(--mut);font-style:italic;padding:4px 0;}
+.btn-sm.ai-alert{background:#fef2f2;color:var(--red);border-color:#fca5a5;}
+
 /* ── Buttons ── */
 .btn-go{background:var(--g);color:#fff;border:none;border-radius:6px;padding:11px 26px;font-size:16px;font-family:inherit;font-weight:600;cursor:pointer;}
 .btn-go:hover{background:#15803d;}
@@ -215,7 +223,7 @@ td.rain-edited::after{content:'●';font-size:6px;color:var(--teal);vertical-ali
   .wrap{padding:0;margin:0;}
   #results{padding:0;margin:0;}
   /* Hide everything except the table card */
-  .results-hdr,details.analytics,
+  .results-hdr,#aiPanel,details.analytics,
   .card:not(#tableCard){display:none!important;}
   #tableCard{display:block!important;box-shadow:none;border:1px solid #ccc;margin:0;page-break-inside:auto;}
   thead th,.r-irr,.r-str,.r-run{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
@@ -391,8 +399,19 @@ td.rain-edited::after{content:'●';font-size:6px;color:var(--teal);vertical-ali
   <div class="results-hdr">
     <span id="resultsTitle"></span>
     <div class="no-print" style="display:flex;gap:6px;">
+      <button id="btnAI" class="btn-sm" onclick="toggleAIPanel()"
+        style="background:var(--glt);color:var(--g);border-color:var(--gbdr);font-weight:700;">✦ AI Summary</button>
       <button class="btn-sm" onclick="window.print()">🖨 Print</button>
       <button class="btn-sm" onclick="downloadCSV()">⬇ CSV</button>
+    </div>
+  </div>
+
+  <!-- AI Summary panel -->
+  <div id="aiPanel" class="card no-print" style="display:none;">
+    <div id="aiLoading" style="display:none;">⏳ Analyzing your irrigation schedule…</div>
+    <div id="aiText"></div>
+    <div style="margin-top:10px;">
+      <button class="btn-sm" onclick="fetchAISummary()">↺ Refresh</button>
     </div>
   </div>
 
@@ -1105,6 +1124,11 @@ function runSim(){
   renderSummary(area,eff,totalNet,irrMode);
   renderTable(irrMode,mad);
   renderCharts(mad);
+  checkStressAlert();
+
+  // Reset AI panel so next open fetches fresh analysis
+  const aiText = document.getElementById('aiText');
+  if(aiText) aiText.textContent='';
 
   document.getElementById('results').style.display='block';
   const modeLabel = irrMode==='none'   ? 'No irrigation'
@@ -1226,15 +1250,42 @@ function renderCharts(mad){
   const labels   = tableData.map(r=>r.ds);
   const madLabel = `${Math.round(mad*100)}% MAD`;
 
+  // Index of today in the dataset (for the vertical "today" marker)
+  const todayStr = new Date().toISOString().split('T')[0];
+  const todayIdx = labels.indexOf(todayStr);
+
+  // Inline plugin: draws a full-height vertical dashed line at today
+  const todayPlugin = {
+    id: 'todayLine',
+    afterDraw(chart){
+      if(todayIdx < 0) return;
+      const {ctx, scales:{x, y}} = chart;
+      const xPos = x.getPixelForValue(todayIdx);
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(xPos, y.top);
+      ctx.lineTo(xPos, y.bottom);
+      ctx.strokeStyle = 'rgba(71,85,105,0.85)';
+      ctx.lineWidth   = 2;
+      ctx.setLineDash([5,4]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle  = '#475569';
+      ctx.font       = 'bold 11px system-ui,sans-serif';
+      ctx.textAlign  = 'center';
+      ctx.fillText('Today', xPos, y.top - 5);
+      ctx.restore();
+    }
+  };
+
   // ── Precompute both views from existing tableData ──
   const fc    = tableData.map(r=>+r.FC_in.toFixed(3));
   const wp    = tableData.map(r=>+r.WP_in.toFixed(3));
   const thr   = tableData.map(r=>+r.Thr_in.toFixed(3));
   const sw    = tableData.map(r=>+r.S.toFixed(3));
-  // Depletion = FC - S (0 when full, PAW when at wilting point)
   const dep   = tableData.map(r=>+(r.FC_in-r.S).toFixed(3));
-  const madDep= tableData.map(r=>+(mad*r.PAW).toFixed(3));  // MAD threshold in depletion units
-  const paw   = tableData.map(r=>+r.PAW.toFixed(3));        // max depletion = PAW
+  const madDep= tableData.map(r=>+(mad*r.PAW).toFixed(3));
+  const paw   = tableData.map(r=>+r.PAW.toFixed(3));
 
   if(cTop) cTop.destroy();
 
@@ -1261,7 +1312,8 @@ function renderCharts(mad){
             callbacks:{label:c=>`${c.dataset.label}: ${(+c.raw).toFixed(2)} in`}}
         },
         scales:{x:{display:false},y:{title:{display:true,text:'Soil water storage (in)',font:{size:12}},min:0}}
-      }
+      },
+      plugins:[todayPlugin]
     });
 
   } else {
@@ -1291,13 +1343,11 @@ function renderCharts(mad){
         },
         scales:{
           x:{display:false},
-          y:{
-            reverse:true,
-            min:0,
-            title:{display:true,text:'Soil water depletion (in)  ←  0 = Full',font:{size:12}}
-          }
+          y:{reverse:true,min:0,
+            title:{display:true,text:'Soil water depletion (in)  ←  0 = Full',font:{size:12}}}
         }
-      }
+      },
+      plugins:[todayPlugin]
     });
   }
 
@@ -1328,6 +1378,166 @@ function renderCharts(mad){
         y:{title:{display:true,text:'Depth (in)',font:{size:12}},min:0,max:yMax}}
     }
   });
+}
+
+
+// ═══════════════  AI SUMMARY (Claude Haiku 4.5 via DO Serverless)  ═══════════
+
+// DigitalOcean Serverless Function URL — key stays server-side, safe for GitHub Pages
+const FUNCTION_URL = 'https://faas-nyc1-2ef2e6cc.doserverless.co/api/v1/web/fn-6c84a070-b561-4f96-9bf4-e0a8e1afd77b/default/call_irrigation_planner_agent';
+
+// Critical yield-sensitive windows per crop (fraction of total season)
+const CRITICAL_WINDOWS = {
+  corn:        {s:.45, e:.72, label:'tasseling and silking (R1)'},
+  soybean:     {s:.50, e:.80, label:'pod fill (R3–R5)'},
+  sorghum:     {s:.45, e:.72, label:'heading and grain fill'},
+  winterWheat: {s:.44, e:.72, label:'heading and grain fill'},
+  sunflower:   {s:.46, e:.74, label:'head development and grain fill'},
+};
+
+function toggleAIPanel(){
+  if(!FUNCTION_URL){ return; }
+  const panel = document.getElementById('aiPanel');
+  const open  = panel.style.display !== 'none';
+  if(open){ panel.style.display='none'; return; }
+  panel.style.display='';
+  panel.scrollIntoView({behavior:'smooth', block:'nearest'});
+  if(!document.getElementById('aiText').textContent.trim())
+    fetchAISummary();
+}
+
+function checkStressAlert(){
+  if(!hasResults) return;
+  const btn = document.getElementById('btnAI');
+  if(!btn) return;
+  if(!FUNCTION_URL){ btn.style.display='none'; return; }
+  btn.style.display='';
+
+  const cropKey  = document.getElementById('crop').value;
+  const cw       = CRITICAL_WINDOWS[cropKey];
+  const total    = kcTotal();
+  const today    = new Date(); today.setHours(0,0,0,0);
+  const mad_frac = parseFloat(document.getElementById('mad').value)/100;
+
+  const critStress = tableData.filter(r=>{
+    const ahead = (new Date(r.ds+'T00:00:00')-today)/86400000;
+    const frac  = r.i/total;
+    return ahead>=0 && ahead<=14 && r.FAW<(1-mad_frac) && frac>=cw.s && frac<=cw.e;
+  });
+
+  const alert = critStress.length>0;
+  btn.classList.toggle('ai-alert', alert);
+  btn.textContent = alert
+    ? `⚠ AI Summary (${critStress.length} stress alert${critStress.length>1?'s':''})`
+    : '✦ AI Summary';
+}
+
+function buildPrompt(){
+  const cropKey = document.getElementById('crop').value;
+  const station = document.getElementById('station').value;
+  const irrMode = document.querySelector('input[name="irrMode"]:checked').value;
+  const mad     = parseFloat(document.getElementById('mad').value);
+  const soilKey = document.getElementById('soilType').value;
+  const crop    = CROPS[cropKey];
+  const cw      = CRITICAL_WINDOWS[cropKey];
+
+  const totP     = tableData.reduce((a,r)=>a+r.precip,0);
+  const totET    = tableData.reduce((a,r)=>a+r.ETc,0);
+  const totalNet = tableData.reduce((a,r)=>a+r.irr,0);
+  const irrEv    = tableData.filter(r=>r.irr>0).length;
+  const maxETc   = Math.max(...tableData.map(r=>r.ETc));
+
+  const eff  = (parseFloat(document.getElementById('sprinkEff').value)||85)/100;
+  const gpm  = parseFloat(document.getElementById('pumpGPM').value)||800;
+  const area = parseFloat(document.getElementById('fieldArea').value)||125;
+  const adRaw= document.getElementById('appDepth').value;
+  const appD = adRaw==='custom'?(parseFloat(document.getElementById('appDepthCustom').value)||1):parseFloat(adRaw);
+  const revD = (area*appD*27154)/(gpm*eff*60*24);
+  const canKeep = (maxETc>0 ? appD/maxETc : 999) >= revD;
+
+  const today = new Date(); today.setHours(0,0,0,0);
+  const t0    = new Date(tableData[0].ds+'T00:00:00');
+  const dayN  = Math.max(0, Math.floor((today-t0)/86400000));
+  const {li,ld,lm,ll} = kc;
+  const total = li+ld+lm+ll;
+  const stage = dayN<li?'Initial':dayN<li+ld?'Development':dayN<li+ld+lm?'Mid-season':'Late';
+
+  const upcoming = tableData.filter(r=>{
+    const ahead=(new Date(r.ds+'T00:00:00')-today)/86400000;
+    return ahead>=0 && ahead<14;
+  });
+
+  const critStress = upcoming.filter(r=>{
+    const frac=r.i/total;
+    return r.FAW<(1-mad/100) && frac>=cw.s && frac<=cw.e;
+  });
+
+  const upcomingLines = upcoming.map(r=>{
+    const frac=r.i/total;
+    const crit = frac>=cw.s&&frac<=cw.e?' ← CRITICAL STAGE':'';
+    const flag = r.irr>0?' — IRRIGATE':r.FAW<(1-mad/100)?' — STRESS'+crit:'';
+    return `  ${r.ds}  ETo ${r.ETo.toFixed(3)} in  ETc ${r.ETc.toFixed(3)} in  ${(r.FAW*100).toFixed(0)}% avail.${flag}`;
+  }).join('\n')||'  No upcoming data';
+
+  const stressAlert = critStress.length>0
+    ? `⚠ CRITICAL: ${critStress.length} stress day(s) projected during ${cw.label} — the most yield-sensitive period.`
+    : '';
+
+  const irrLabel = {
+    fixed:`MAD-triggered at ${mad}% depletion`,
+    refill:'refill to field capacity',
+    none:'no irrigation (dryland)'
+  }[irrMode]||irrMode;
+
+  return `You are a practical irrigation advisor helping a Kansas farmer using a scheduling tool. Be concise and actionable. Plain language only — no jargon. Maximum 5–6 sentences. Never recommend specific "Days ahead" numbers. Never suggest the farmer change their pump, well, or irrigation hardware — they know their system's limits.
+
+SEASON:
+Crop: ${crop.name} | Station: ${station}, KS | Planting: ${tableData[0].ds}
+Soil: ${soilKey} | Strategy: ${irrLabel}
+Rainfall projected: ${totP.toFixed(1)} in | Crop ET: ${totET.toFixed(1)} in | Net irrigation: ${totalNet.toFixed(1)} in (${irrEv} starts)
+Pivot: ${appD} in/pass, ${revD.toFixed(1)}-day revolution — ${canKeep?'can keep up at peak':'may struggle to keep up at peak demand of '+maxETc.toFixed(3)+' in/day'}
+Growth stages: Initial d0–${li} | Dev d${li}–${li+ld} | Mid d${li+ld}–${li+ld+lm} | Late d${li+ld+lm}–${total}
+Now: Day ${dayN} (${stage}) | Critical window: ${cw.label} (d${Math.round(cw.s*total)}–${Math.round(cw.e*total)})
+
+NEXT 14 DAYS:
+${upcomingLines}
+${stressAlert}
+
+Provide: (1) 2–3 sentence plain-English outlook. (2) ${
+  critStress.length>0
+    ? 'What specific irrigation action the farmer should take right now to reduce stress risk during the critical window.'
+    : !canKeep
+    ? 'Advise on irrigation timing strategy to best manage the peak demand period — focus on scheduling, not on hardware changes.'
+    : 'One practical tip for the coming weeks.'
+}`;
+}
+
+async function fetchAISummary(){
+  if(!FUNCTION_URL) return;
+  const loadEl = document.getElementById('aiLoading');
+  const textEl = document.getElementById('aiText');
+  loadEl.style.display=''; textEl.textContent='';
+
+  try {
+    const res  = await fetch(FUNCTION_URL, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({prompt: buildPrompt()})
+    });
+    const data = await res.json();
+    const text = data.content || data.choices?.[0]?.message?.content || JSON.stringify(data);
+    // Convert **bold** to <strong> and double newlines to paragraphs
+    const html = text
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .split(/\n\n+/)
+      .map(p => `<p>${p.replace(/\n/g,'<br>')}</p>`)
+      .join('');
+    textEl.innerHTML = html;
+  } catch(e){
+    textEl.textContent=`Could not reach AI service: ${e.message}.`;
+  } finally {
+    loadEl.style.display='none';
+  }
 }
 
 
