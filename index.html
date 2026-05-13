@@ -3,7 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Kansas Irrigation Scheduler</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<title>Daily Irrigation Planner</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
 :root {
@@ -140,10 +142,12 @@ tbody tr:hover{background:#f8fafc!important;}
 
 .r-irr{background:#fff7ed;} .r-run{background:#f7fbff;} .r-str{background:#fef3c7;}
 tr.obs td:first-child{border-left:3px solid #bbf7d0;}
-tr.fut td{color:#b0bec5;} tr.fut .tag{opacity:1;}
+tr.fut td:first-child{border-left:3px solid #bae6fd;}
+tr.fut td{color:#64748b;} tr.fut .tag{opacity:1;}
 
 .tag{display:inline-block;padding:3px 9px;border-radius:3px;font-size:13px;font-weight:700;white-space:nowrap;}
 .tag-ok {background:var(--glt); color:var(--g);}
+.tag-lim{background:#fff7ed;    color:#92400e;}  /* threshold crossed end-of-day */
 .tag-irr{background:#fff7ed;    color:#c2410c;}
 .tag-run{background:#e0f2fe;    color:#0369a1;}
 .tag-str{background:var(--amlt);color:var(--amb);}
@@ -232,13 +236,20 @@ td.rain-edited::after{content:'●';font-size:6px;color:var(--teal);vertical-ali
   thead{display:table-header-group;}
   tbody tr{page-break-inside:avoid;}
 }
+/* ── Map modal ── */
+.map-modal-overlay{position:fixed;inset:0;z-index:999;background:rgba(15,23,42,.55);display:flex;align-items:center;justify-content:center;}
+.map-modal-box{background:#fff;border-radius:10px;padding:20px;width:580px;max-width:96vw;box-shadow:0 8px 32px rgba(0,0,0,.18);}
+.map-modal-box h3{margin:0 0 14px;font-size:17px;color:var(--txt);}
+#leafletMap{height:320px;border-radius:6px;border:1px solid var(--bdr);margin:12px 0;}
+.map-coords{font-size:12px;color:var(--mut);margin-bottom:12px;}
+.map-modal-btns{display:flex;gap:8px;justify-content:flex-end;}
 </style>
 </head>
 <body>
 
 <header>
   <div class="header-inner">
-    <h1>Daily Irrigation Planner</h1>
+    <img src="logo-header.svg" alt="Daily Irrigation Planner" height="54">
   </div>
 </header>
 
@@ -253,10 +264,11 @@ td.rain-edited::after{content:'●';font-size:6px;color:var(--teal);vertical-ali
 
       <div class="grp grp-loc">
         <div class="gtitle">Location</div>
-        <div>
-          <label>Mesonet Station</label>
-          <select id="station"></select>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span id="locName" style="flex:1;font-size:15px;font-weight:500;color:var(--txt);">Manhattan, KS</span>
+          <button type="button" class="btn-sm" onclick="openMapModal()">📍 Change</button>
         </div>
+        <div id="locCoords" style="font-size:12px;color:var(--mut);margin-top:3px;">39.1836° N, 96.5717° W</div>
       </div>
 
       <div class="grp grp-crop">
@@ -313,8 +325,8 @@ td.rain-edited::after{content:'●';font-size:6px;color:var(--teal);vertical-ali
         </div>
         <label style="margin-bottom:2px;">Root Depth Profile</label>
         <div class="radio-row">
-          <label><input type="radio" name="rdMode" value="constant"> Constant</label>
           <label><input type="radio" name="rdMode" value="dynamic" checked> Dynamic</label>
+          <label><input type="radio" name="rdMode" value="constant"> Constant</label>
         </div>
         <div class="fg fg-2" style="margin-top:10px;">
           <div>
@@ -365,9 +377,9 @@ td.rain-edited::after{content:'●';font-size:6px;color:var(--teal);vertical-ali
         <div style="margin-bottom:10px;">
           <label style="margin-bottom:4px;">Irrigation Strategy</label>
           <div class="radio-row">
-            <label><input type="radio" name="irrMode" value="fixed" checked onchange="onIrrMode()"> Fixed depth</label>
-            <label><input type="radio" name="irrMode" value="refill" onchange="onIrrMode()"> Refill to FC</label>
-            <label><input type="radio" name="irrMode" value="none" onchange="onIrrMode()"> No irrigation</label>
+            <label><input type="radio" name="irrMode" value="fixed" checked> Fixed depth</label>
+            <label><input type="radio" name="irrMode" value="refill"> Refill to FC</label>
+            <label><input type="radio" name="irrMode" value="none"> No irrigation</label>
           </div>
         </div>
         <div id="madWrap">
@@ -387,7 +399,7 @@ td.rain-edited::after{content:'●';font-size:6px;color:var(--teal);vertical-ali
   </div><!-- /setup-outer -->
 
   <div style="margin-top:16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
-    <button class="btn-go" onclick="generateSchedule()">▶ Generate Schedule</button>
+    <button id="btnGenerate" class="btn-go" onclick="generateSchedule()">▶ Generate Schedule</button>
   </div>
 </div>
 
@@ -395,23 +407,18 @@ td.rain-edited::after{content:'●';font-size:6px;color:var(--teal);vertical-ali
 <!-- ══════════  RESULTS  ══════════ -->
 <div id="results">
 
-  <!-- Title bar + actions -->
+  <!-- Title bar -->
   <div class="results-hdr">
     <span id="resultsTitle"></span>
-    <div class="no-print" style="display:flex;gap:6px;">
-      <button id="btnAI" class="btn-sm" onclick="toggleAIPanel()"
-        style="background:var(--glt);color:var(--g);border-color:var(--gbdr);font-weight:700;">✦ AI Summary</button>
-      <button class="btn-sm" onclick="window.print()">🖨 Print</button>
-      <button class="btn-sm" onclick="downloadCSV()">⬇ CSV</button>
-    </div>
   </div>
 
-  <!-- AI Summary panel -->
+  <!-- AI Summary panel — always visible after first generate -->
   <div id="aiPanel" class="card no-print" style="display:none;">
     <div id="aiLoading" style="display:none;">⏳ Analyzing your irrigation schedule…</div>
     <div id="aiText"></div>
-    <div style="margin-top:10px;">
-      <button class="btn-sm" onclick="fetchAISummary()">↺ Refresh</button>
+    <div style="margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <button id="btnAIRefresh" class="btn-sm" onclick="fetchAISummary()" style="display:none;">↺ Refresh AI</button>
+      <span id="aiStaleNote" style="display:none;font-size:13px;color:var(--amb);">⚠ Settings changed — refresh for updated analysis</span>
     </div>
   </div>
 
@@ -438,14 +445,18 @@ td.rain-edited::after{content:'●';font-size:6px;color:var(--teal);vertical-ali
 
   <!-- Table — always visible -->
   <div class="card" id="tableCard">
-    <p class="note no-print" style="margin-bottom:10px;">
-      💧 <strong>Tip:</strong> Click any observed rain cell to enter your own field measurement — values are saved and persist across visits.
-    </p>
+    <div class="no-print" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+      <p class="note" style="margin:0;flex:1;">
+        💧 Click any observed rain cell to enter your own field measurement.
+      </p>
+      <div style="display:flex;gap:6px;flex-shrink:0;">
+        <button class="btn-sm" onclick="window.print()">🖨 Print</button>
+        <button class="btn-sm" onclick="downloadCSV()">⬇ CSV</button>
+      </div>
+    </div>
     <div class="legend no-print">
-      <span><span class="lb" style="background:#fff7ed;border:1px solid #fb923c;"></span>Irrigate</span>
-      <span><span class="lb" style="background:#f7fbff;border:1px solid #bae6fd;"></span>Running</span>
-      <span style="color:#b0bec5;">Faded = forecast</span>
-      <span><span class="lb" style="background:var(--tealt);border:1px solid rgba(13,148,136,.35);"></span>Rain edited</span>
+      <span><span style="display:inline-block;width:3px;height:14px;background:#bbf7d0;border-radius:1px;vertical-align:middle;margin-right:4px;"></span>Observed</span>
+      <span><span style="display:inline-block;width:3px;height:14px;background:#bae6fd;border-radius:1px;vertical-align:middle;margin-right:4px;"></span>Forecast</span>
     </div>
     <div class="tscroll">
       <table id="schedTable">
@@ -468,9 +479,9 @@ td.rain-edited::after{content:'●';font-size:6px;color:var(--teal);vertical-ali
     </div>
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-top:12px;">
       <p class="note" style="margin:0;flex:1;">
-        Future days use a 7-day rolling ETo average blended with a statewide daily climatology and assume zero precipitation.
+        Soil Water Processes Lab | Agronomy | Kansas State University
       </p>
-      <button id="resetRainBtn" class="btn-sm no-print" onclick="resetAllRain()" style="display:none;white-space:nowrap;">↺ Restore Mesonet rain</button>
+      <button id="resetRainBtn" class="btn-sm no-print" onclick="resetAllRain()" style="display:none;white-space:nowrap;">↺ Restore original rain</button>
     </div>
   </div>
 
@@ -478,74 +489,19 @@ td.rain-edited::after{content:'●';font-size:6px;color:var(--teal);vertical-ali
 </div><!-- /wrap -->
 
 <script>
-// ═══════════════  STATIC DATA  ════════════════════
+// ═══════════════  LOCATION & FORECAST CONFIG  ═════════
 
-const STATION_LATS = {
-  "Ashland Bottoms":39.13,"Atchison":39.56,"Belleville":39.83,
-  "Caney":37.01,"Chanute":37.68,"Clay Center":39.38,"Colby":39.39,
-  "Coldwater":37.27,"Concordia":39.55,"Derby":37.72,
-  "Dodge City":37.77,"El Dorado":37.82,"Emporia":38.40,
-  "Ensign":37.64,"Garden City":37.97,"Goodland":39.35,
-  "Great Bend":38.35,"Greensburg":37.60,"Gypsum":38.71,
-  "Hamilton":38.00,"Hays":38.86,"Hiawatha":39.85,"Hill City":39.37,
-  "Holton":39.47,"Hutchinson":37.99,"Iola":37.93,
-  "Junction City":39.02,"Kingman":37.64,"Kinsley":37.93,
-  "Larned":38.18,"Liberal":37.04,"Logan":39.65,
-  "Manhattan":39.19,"Marion":38.35,"Meade":37.28,
-  "Medicine Lodge":37.28,"Minneapolis":39.12,"Moundridge":38.20,
-  "Ness City":38.46,"Newton":38.04,"Oakley":39.13,
-  "Oberlin":39.82,"Osborne":39.44,"Ottawa":38.61,
-  "Parsons":37.34,"Phillipsburg":39.75,"Plainville":39.23,
-  "Pratt":37.65,"Russell":38.90,"Sabetha":39.90,
-  "Salina":38.84,"Scott City":38.47,"Smith Center":39.78,
-  "St. John":37.99,"Sublette":37.48,"Syracuse":37.98,
-  "Tribune":38.47,"Ulysses":37.58,"WaKeeney":39.02,
-  "Wellington":37.27,"Wichita":37.69,"Winfield":37.24
-};
+// Default: Manhattan, KS — updated when user picks a location on the map
+let userLat  = 39.1836;
+let userLng  = -96.5717;
+let userLocName = 'Manhattan, KS';
 
+// Forecast window (days). Only rainfall within PRECIP_FORECAST_DAYS is used,
+// and only if precipitation_probability_max >= PRECIP_PROB_THRESHOLD.
+const FORECAST_DAYS        = 14;   // change to 7 for shorter forecast window
+const PRECIP_FORECAST_DAYS = 3;    // rainfall accepted only within this window
+const PRECIP_PROB_THRESHOLD= 50;   // % probability required to include forecast rain
 
-// Statewide median ETo (in/day) indexed by DOY-1 (0=Jan1, 365=Dec31). Used for forecast.
-const eto_state = [0.03 , 0.03 , 0.03 , 0.03 , 0.03 , 0.03 , 0.03 , 0.03 , 0.03 ,
-       0.031, 0.031, 0.031, 0.031, 0.031, 0.032, 0.032, 0.032, 0.032,
-       0.033, 0.034, 0.034, 0.035, 0.035, 0.036, 0.037, 0.038, 0.039,
-       0.04 , 0.041, 0.043, 0.045, 0.045, 0.046, 0.047, 0.047, 0.047,
-       0.048, 0.049, 0.051, 0.051, 0.051, 0.053, 0.054, 0.054, 0.055,
-       0.055, 0.056, 0.056, 0.057, 0.057, 0.057, 0.059, 0.061, 0.064,
-       0.067, 0.069, 0.074, 0.082, 0.088, 0.088, 0.088, 0.089, 0.09 ,
-       0.091, 0.093, 0.097, 0.101, 0.102, 0.102, 0.102, 0.103, 0.103,
-       0.103, 0.103, 0.104, 0.105, 0.106, 0.106, 0.106, 0.106, 0.106,
-       0.108, 0.113, 0.117, 0.119, 0.12 , 0.122, 0.123, 0.127, 0.131,
-       0.134, 0.136, 0.139, 0.141, 0.142, 0.144, 0.145, 0.146, 0.147,
-       0.148, 0.148, 0.148, 0.148, 0.149, 0.149, 0.15 , 0.151, 0.151,
-       0.151, 0.152, 0.153, 0.154, 0.155, 0.155, 0.155, 0.155, 0.155,
-       0.155, 0.157, 0.157, 0.158, 0.162, 0.165, 0.165, 0.165, 0.165,
-       0.165, 0.165, 0.165, 0.164, 0.164, 0.165, 0.168, 0.169, 0.171,
-       0.171, 0.171, 0.173, 0.173, 0.175, 0.176, 0.178, 0.178, 0.178,
-       0.178, 0.179, 0.182, 0.182, 0.186, 0.191, 0.198, 0.199, 0.202,
-       0.206, 0.207, 0.21 , 0.212, 0.217, 0.224, 0.226, 0.227, 0.229,
-       0.229, 0.23 , 0.231, 0.232, 0.234, 0.234, 0.234, 0.234, 0.234,
-       0.234, 0.234, 0.234, 0.234, 0.234, 0.234, 0.234, 0.234, 0.234,
-       0.234, 0.233, 0.231, 0.23 , 0.23 , 0.23 , 0.23 , 0.229, 0.228,
-       0.227, 0.227, 0.226, 0.225, 0.224, 0.223, 0.223, 0.222, 0.22 ,
-       0.22 , 0.22 , 0.22 , 0.22 , 0.22 , 0.22 , 0.22 , 0.219, 0.218,
-       0.216, 0.215, 0.214, 0.214, 0.211, 0.208, 0.205, 0.202, 0.201,
-       0.201, 0.2  , 0.198, 0.195, 0.195, 0.195, 0.195, 0.194, 0.193,
-       0.191, 0.191, 0.19 , 0.189, 0.188, 0.188, 0.188, 0.187, 0.187,
-       0.187, 0.187, 0.187, 0.186, 0.185, 0.183, 0.183, 0.181, 0.18 ,
-       0.179, 0.178, 0.177, 0.176, 0.173, 0.173, 0.17 , 0.169, 0.169,
-       0.168, 0.168, 0.168, 0.167, 0.166, 0.166, 0.164, 0.161, 0.156,
-       0.153, 0.151, 0.149, 0.149, 0.145, 0.139, 0.138, 0.138, 0.137,
-       0.137, 0.137, 0.136, 0.135, 0.135, 0.134, 0.134, 0.132, 0.129,
-       0.126, 0.123, 0.12 , 0.118, 0.117, 0.117, 0.116, 0.114, 0.112,
-       0.112, 0.11 , 0.108, 0.107, 0.105, 0.103, 0.102, 0.101, 0.093,
-       0.085, 0.082, 0.08 , 0.08 , 0.08 , 0.079, 0.077, 0.075, 0.073,
-       0.073, 0.072, 0.071, 0.069, 0.067, 0.067, 0.066, 0.066, 0.065,
-       0.065, 0.065, 0.064, 0.064, 0.062, 0.061, 0.06 , 0.059, 0.058,
-       0.056, 0.055, 0.054, 0.054, 0.052, 0.05 , 0.05 , 0.049, 0.048,
-       0.046, 0.045, 0.044, 0.044, 0.043, 0.043, 0.043, 0.042, 0.042,
-       0.041, 0.041, 0.041, 0.04 , 0.039, 0.039, 0.039, 0.039, 0.039,
-       0.038, 0.038, 0.038, 0.038, 0.038, 0.038, 0.037, 0.036, 0.036,
-       0.035, 0.035, 0.034, 0.035, 0.034, 0.034, 0.034]
 
 // FAO-56 Kc values. stages=[Lini,Ldev,Lmid,Llate] days. plantDate='MM-DD' for Kansas.
 // Winter wheat: Oct 15 planting → ~240 days to ~Jun 12 harvest.
@@ -743,11 +699,11 @@ function editRain(cell){
   function commit(){
     const val=parseFloat(inp.value);
     if(!isNaN(val) && val>=0){
-      // If within 0.001 of the Mesonet value, remove override (restore Mesonet)
+      // If within 0.001 of the original value, remove override (restore original)
       if(Math.abs(val-meso)<0.001) delete rainOverrides[ds];
       else rainOverrides[ds]=+val.toFixed(3);
     } else {
-      delete rainOverrides[ds]; // empty → restore Mesonet
+      delete rainOverrides[ds]; // empty → restore original
     }
     saveRainOverrides();
     recompute();
@@ -763,46 +719,22 @@ function editRain(cell){
 
 // ═══════════════  INIT  ════════════════════════════
 
-let stationLats = {...STATION_LATS};
-
 window.addEventListener('DOMContentLoaded', async () => {
-  // Load persisted rain overrides
   await loadRainOverrides();
 
-  // Try live station list from Mesonet
-  try {
-    const r = await fetch('https://mesonet.k-state.edu/rest/stationnames/');
-    if(r.ok){
-      const fetched={};
-      (await r.text()).trim().split('\n').slice(1).forEach(l=>{
-        const p=l.split(',');
-        if(p.length>=4){const n=p[0].trim(),la=parseFloat(p[2]);if(n&&!isNaN(la))fetched[n]=la;}
-      });
-      if(Object.keys(fetched).length>10) stationLats=fetched;
-    }
-  } catch(e){}
-
-  const sel=document.getElementById('station');
-  Object.keys(stationLats).sort().forEach(n=>{
-    const o=document.createElement('option');
-    o.value=o.textContent=n;
-    if(n==='Manhattan') o.selected=true;
-    sel.appendChild(o);
-  });
-  onCropChange();  // sets planting date + Kc defaults for initial crop
+  onCropChange();
   updateRevDisplay();
 
-  // Station change: mark cache stale (silently)
-  sel.addEventListener('change',()=>{ wxCache.station=null; });
-
-  // Numeric inputs: debounced recompute + rev time update
-  ['rootDepth','initWater','fieldArea','pumpGPM','sprinkEff','appDepthCustom']
-    .forEach(id=>document.getElementById(id).addEventListener('input',()=>{updateRevDisplay();debouncedRecompute();}));
+  // Planting date change: invalidate weather cache
   document.getElementById('plantingDate').addEventListener('input',()=>{
-    wxCache.station=null;  // planting date shift may uncover unfetched dates
+    wxCache.cacheKey = null;
     drawKc();
     debouncedRecompute();
   });
+
+  // Numeric inputs
+  ['rootDepth','initWater','fieldArea','pumpGPM','sprinkEff','appDepthCustom']
+    .forEach(id=>document.getElementById(id).addEventListener('input',()=>{updateRevDisplay();debouncedRecompute();}));
 
   // Selects: immediate recompute
   ['soilType','appDepth'].forEach(id=>
@@ -834,15 +766,9 @@ function onCropChange(){
   document.getElementById('rootDepth').value = c.root;
   kc = {ki:c.Kc_ini,km:c.Kc_mid,ke:c.Kc_end,
         li:c.stages[0],ld:c.stages[1],lm:c.stages[2],ll:c.stages[3]};
-
-  // Set crop-specific default planting date, keeping the current year
-  // For winter wheat (fall planting), use the current year if we're before Oct,
-  // otherwise use the current year as-is (farmer can adjust)
-  const now = new Date();
-  const yr  = now.getFullYear();
+  const yr = new Date().getFullYear();
   document.getElementById('plantingDate').value = `${yr}-${c.plantDate}`;
-
-  wxCache.station = null;  // new planting date → refresh weather
+  wxCache.cacheKey = null;
   drawKc();
   debouncedRecompute();
 }
@@ -885,19 +811,6 @@ function resetAllRain(){
 
 // ═══════════════  PHYSICS  ════════════════════════
 
-function doy(d){ return Math.floor((d-new Date(d.getFullYear(),0,0))/86400000); }
-
-function getRA(lat,day){
-  const phi=lat*Math.PI/180,dr=1+.033*Math.cos(2*Math.PI*day/365);
-  const del=.409*Math.sin(2*Math.PI*day/365-1.39);
-  const ws=Math.acos(Math.max(-1,Math.min(1,-Math.tan(phi)*Math.tan(del))));
-  return (24*60/Math.PI)*.082*dr*(ws*Math.sin(phi)*Math.sin(del)+Math.cos(phi)*Math.cos(del)*Math.sin(ws));
-}
-
-function hargreaves(Tmax,Tmin,lat,day){
-  return Math.max(0,.0023*getRA(lat,day)*Math.sqrt(Math.max(.5,Tmax-Tmin))*((Tmax+Tmin)/2+17.8)/25.4);
-}
-
 function getKc(i){
   const {ki,km,ke,li,ld,lm,ll}=kc, d=Math.min(i,li+ld+lm+ll-1);
   if(d<li)          return ki;
@@ -917,122 +830,153 @@ function getZ(i,crop,Zm,dynamic){
 function runoff(P,CN){ const S=1000/CN-10,Ia=.2*S; return P<=Ia?0:(P-Ia)*(P-Ia)/(P-Ia+S); }
 function pivDays(A,d,Q,E){ return (A*d*27154)/(Q*E*60*24); }
 
-// OLS model: ETo (mm/day) = -0.9848 + 0.1201·srad + 2.2454·vpd + 0.2264·wspd → converted to in/day
-// srad: MJ/m²/day (SR) · vpd: kPa (VPDEFAVG) · wspd: m/s (WSPD2MAVG)
-function olsETo(srad, vpd, wspd){
-  const s = (isNaN(srad)||srad<0) ? null : srad;
-  const v = (isNaN(vpd) ||vpd <0) ? null : vpd;
-  const w = (isNaN(wspd)||wspd<0) ? 2.0  : wspd;  // 2 m/s default
-  if(s===null||v===null) return null;
-  return Math.max(0, -0.9848 + 0.1201*s + 2.2454*v + 0.2264*w)/25.4;
+// ═══════════════  OPEN-METEO WEATHER  ════════════════
+
+let wxCache = {cacheKey: null, wx: {}};
+
+function omCacheKey(lat, lng) {
+  return `${lat.toFixed(4)},${lng.toFixed(4)}`;
 }
 
-// DOY-based climatology lookup (0-indexed into eto_state, in/day)
-function doyETo(date){ return eto_state[Math.min(doy(date)-1, eto_state.length-1)]; }
+async function fetchWeatherOpenMeteo(lat, lng, startDate, endDate) {
+  // startDate, endDate: 'YYYY-MM-DD' strings
+  // Returns wx dict keyed by date string
+  const wx = {};
+  const tz = 'America%2FChicago';
+  const today = new Date(); today.setHours(0,0,0,0);
+  const todayStr = today.toISOString().split('T')[0];
 
-// 7-day rolling ETo — OLS when data complete, Hargreaves as fallback
-function computeRollingETo(wx,today,lat){
-  const vals=[];
-  for(let d=1;d<=7;d++){
-    const dt=new Date(today); dt.setDate(dt.getDate()-d);
-    const ds=dt.toISOString().split('T')[0];
-    const w=wx[ds];
-    if(w){
-      const e = olsETo(w.srad,w.vpd,w.wspd) ?? hargreaves(w.tmax,w.tmin,lat,doy(dt));
-      if(e>0&&e<0.5) vals.push(e);
-    }
+  // ── Historical (archive API) ──────────────────────
+  if (startDate <= todayStr) {
+    const histEnd = endDate < todayStr ? endDate : todayStr;
+    const histVars = 'temperature_2m_max,temperature_2m_min,precipitation_sum,et0_fao_evapotranspiration';
+    const histUrl  = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lng}`
+      + `&start_date=${startDate}&end_date=${histEnd}&daily=${histVars}&timezone=${tz}`;
+    try {
+      const resp = await fetch(histUrl);
+      if (resp.ok) {
+        const data = await resp.json();
+        const d = data.daily;
+        d.time.forEach((ds, i) => {
+          const tmax = d.temperature_2m_max[i];
+          const tmin = d.temperature_2m_min[i];
+          if (tmax == null || tmax < -40 || tmax > 55) return;
+          const pr  = d.precipitation_sum[i] ?? 0;
+          const et0 = d.et0_fao_evapotranspiration[i];
+          wx[ds] = {
+            tmax, tmin,
+            p:   Math.max(0, pr) / 25.4,
+            eto: et0 != null ? Math.max(0, et0) / 25.4 : null,
+            precip_prob: null   // historical — no probability
+          };
+        });
+        console.log(`Loaded ${Object.keys(wx).length} historical days from Open-Meteo.`);
+      }
+    } catch(e) { console.warn('Open-Meteo archive error:', e.message); }
   }
-  return vals.length>=2 ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
-}
 
+  // ── Forecast API ──────────────────────────────────
+  const fcastVars = 'temperature_2m_max,temperature_2m_min,precipitation_sum,'
+    + 'precipitation_probability_max,et0_fao_evapotranspiration';
+  const fcastUrl  = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}`
+    + `&daily=${fcastVars}&forecast_days=${FORECAST_DAYS}&timezone=${tz}`;
+  try {
+    const resp = await fetch(fcastUrl);
+    if (resp.ok) {
+      const data = await resp.json();
+      const d = data.daily;
+      d.time.forEach((ds, i) => {
+        if (ds <= todayStr) return;  // don't overwrite historical with forecast
+        const tmax = d.temperature_2m_max[i];
+        const tmin = d.temperature_2m_min[i];
+        if (tmax == null) return;
+        const pr   = d.precipitation_sum[i] ?? 0;
+        const et0  = d.et0_fao_evapotranspiration[i];
+        const prob = d.precipitation_probability_max[i] ?? 0;
+        wx[ds] = {
+          tmax, tmin,
+          p:           Math.max(0, pr) / 25.4,
+          eto:         et0 != null ? Math.max(0, et0) / 25.4 : null,
+          precip_prob: prob
+        };
+      });
+    }
+  } catch(e) { console.warn('Open-Meteo forecast error:', e.message); }
 
-// ═══════════════  MESONET  ════════════════════════
-
-function parseCSV(txt){
-  const lines=txt.trim().split('\n'); if(lines.length<2) return [];
-  const hdrs=lines[0].split(',').map(h=>h.trim());
-  return lines.slice(1).map(l=>{const v=l.split(','),o={};hdrs.forEach((h,i)=>o[h]=(v[i]||'').trim());return o;});
+  return wx;
 }
-function ts2ds(ts){
-  ts=(ts||'').trim();
-  if(ts.length>=10&&ts[4]==='-') return ts.slice(0,10);
-  if(ts.length>=8) return `${ts.slice(0,4)}-${ts.slice(4,6)}-${ts.slice(6,8)}`;
-  return null;
-}
-function mesoFmt(d){const p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}000000`;}
 
 
 // ═══════════════  SIMULATION  ═════════════════════
 
 let cTop=null, cBot=null, tableData=[];
-let wxCache={station:null,wx:{}};
 let hasResults=false;
 
 function debounce(fn,ms){ let t; return(...args)=>{clearTimeout(t);t=setTimeout(()=>fn(...args),ms);}; }
 const debouncedRecompute=debounce(()=>recompute(),400);
 
 async function generateSchedule(){
-  const station=document.getElementById('station').value;
-  const plantStr=document.getElementById('plantingDate').value;
-  if(!plantStr){alert('Please enter a planting date.');return;}
-  if(station!==wxCache.station){
-    const nDays=kcTotal(), t0=new Date(plantStr+'T00:00:00');
-    const tEnd=new Date(t0); tEnd.setDate(tEnd.getDate()+nDays-1);
-    const today=new Date(); today.setHours(0,0,0,0);
-    const fetchEnd=today<tEnd?today:tEnd;
-    const newWx={};
+  const plantStr = document.getElementById('plantingDate').value;
+  if(!plantStr){alert('Please enter a planting date.'); return;}
 
-    if(t0<=fetchEnd){
-      const url=`https://mesonet.k-state.edu/rest/stationdata/?stn=${encodeURIComponent(station)}`
-        +`&int=day&t_start=${mesoFmt(t0)}&t_end=${mesoFmt(fetchEnd)}&vars=TEMP2MMAX,TEMP2MMIN,PRECIP,SR,VPDEFAVG,WSPD2MAVG`;
-      try{
-        const resp=await fetch(url);
-        if(resp.ok){
-          let n=0;
-          parseCSV(await resp.text()).forEach(row=>{
-            const ds=ts2ds(row['TIMESTAMP']||'');if(!ds) return;
-            const tmx=parseFloat(row['TEMP2MMAX']),tmn=parseFloat(row['TEMP2MMIN']),pr=parseFloat(row['PRECIP']);
-            if(isNaN(tmx)||tmx<-40||tmx>55) return;
-            const srad=parseFloat(row['SR']);
-            const vpd =parseFloat(row['VPDEFAVG']);
-            const wspd=parseFloat(row['WSPD2MAVG']);
-            newWx[ds]={
-              tmax:tmx, tmin:tmn,
-              p:isNaN(pr)||pr<0?0:pr/25.4,
-              srad:isNaN(srad)||srad<0?NaN:srad,
-              vpd :isNaN(vpd) ||vpd <0?NaN:vpd,
-              wspd:isNaN(wspd)||wspd<0?NaN:wspd
-            };
-            n++;
-          });
-          console.log(`Loaded ${n} days from ${station}.`);
-        }
-      } catch(e){ console.warn('Mesonet fetch error:', e.message); }
+  const btn = document.getElementById('btnGenerate');
+  btn.disabled = true;
+  btn.textContent = '⏳ Requesting data…';
+
+  try {
+    const key = omCacheKey(userLat, userLng);
+    if(key !== wxCache.cacheKey){
+      const t0 = new Date(plantStr+'T00:00:00');
+      const today = new Date(); today.setHours(0,0,0,0);
+
+      const fetchEnd = new Date(today);
+      fetchEnd.setDate(fetchEnd.getDate()+FORECAST_DAYS);
+      const fetchEndStr = fetchEnd.toISOString().split('T')[0];
+      const startStr    = t0.toISOString().split('T')[0];
+
+      wxCache.wx = await fetchWeatherOpenMeteo(userLat, userLng, startStr, fetchEndStr);
+      wxCache.cacheKey = key;
     }
-    wxCache={station,wx:newWx};
-  }
 
-  runSim();
-  if(!hasResults){
-    document.getElementById('results').scrollIntoView({behavior:'smooth'});
-    hasResults=true;
+    runSim();
+    if(!hasResults){
+      document.getElementById('results').scrollIntoView({behavior:'smooth'});
+      hasResults=true;
+      if(FUNCTION_URL){
+        document.getElementById('aiPanel').style.display='';
+        fetchAISummary();
+      }
+    }
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '▶ Generate Schedule';
   }
 }
 
-function recompute(){ if(!hasResults) return; runSim(); }
+function recompute(){
+  if(!hasResults) return;
+  runSim();
+  // Mark AI as stale after settings change
+  if(FUNCTION_URL){
+    const note = document.getElementById('aiStaleNote');
+    const btn  = document.getElementById('btnAIRefresh');
+    if(note) note.style.display='';
+    if(btn)  btn.style.display='';
+  }
+}
 
 function runSim(){
-  const station  =document.getElementById('station').value;
   const cropKey  =document.getElementById('crop').value;
   const soilKey  =document.getElementById('soilType').value;
   const plantStr =document.getElementById('plantingDate').value;
   if(!plantStr) return;
 
-  const nDays   =kcTotal();
-  const Zm      =parseFloat(document.getElementById('rootDepth').value)||48;
+  const crop=CROPS[cropKey], soil=SOILS[soilKey];
+  const wx  = wxCache.wx;
+  const Zm  =parseFloat(document.getElementById('rootDepth').value)||48;
   const dynamic =document.querySelector('input[name="rdMode"]:checked').value==='dynamic';
-  const initRaw  = parseFloat(document.getElementById('initWater').value);
-  const initPct  = (isNaN(initRaw) ? 75 : initRaw) / 100;
+  const initRaw = parseFloat(document.getElementById('initWater').value);
+  const initPct = (isNaN(initRaw) ? 75 : initRaw) / 100;
   const area    =parseFloat(document.getElementById('fieldArea').value)||125;
   const gpm     =parseFloat(document.getElementById('pumpGPM').value)||800;
   const eff     =(parseFloat(document.getElementById('sprinkEff').value)||85)/100;
@@ -1041,13 +985,14 @@ function runSim(){
   const irrMode =document.querySelector('input[name="irrMode"]:checked').value;
   const mad     =parseFloat(document.getElementById('mad').value)/100;
 
-  const crop=CROPS[cropKey], soil=SOILS[soilKey], lat=stationLats[station]||38.8;
-  const t0=new Date(plantStr+'T00:00:00');
   const today=new Date(); today.setHours(0,0,0,0);
-  const wx=wxCache.wx;
+  const t0=new Date(plantStr+'T00:00:00');
 
-  // 7-day rolling ETo for forecast days (blended 70% rolling / 30% climatology)
-  const rollingE=computeRollingETo(wx,today,lat);
+  // Simulate only to today + FORECAST_DAYS or end of season, whichever is shorter
+  const simEnd = new Date(today); simEnd.setDate(simEnd.getDate()+FORECAST_DAYS);
+  const seasonEnd = new Date(t0); seasonEnd.setDate(seasonEnd.getDate()+kcTotal()-1);
+  const lastDay = simEnd < seasonEnd ? simEnd : seasonEnd;
+  const nDays = Math.max(1, Math.floor((lastDay - t0)/86400000) + 1);
 
   tableData=[];
   const Z0=getZ(0,crop,Zm,dynamic);
@@ -1068,17 +1013,25 @@ function runSim(){
     const w=wx[ds];
     let ETo,precip,mesoP,src;
 
-    if(!fut&&w){
-      ETo = olsETo(w.srad,w.vpd,w.wspd) ?? hargreaves(w.tmax,w.tmin,lat,doy(date));
-      mesoP=w.p;
-      const override=rainOverrides[ds];
-      if(override!==undefined){precip=override;src='field';}
-      else{precip=mesoP;src='obs';}
+    if(!fut && w){
+      ETo   = w.eto ?? 0.15;  // Open-Meteo PM ETo; 0.15 in/day safety fallback
+      mesoP = w.p;
+      const override = rainOverrides[ds];
+      if(override !== undefined){ precip=override; src='field'; }
+      else { precip=mesoP; src='obs'; }
+
+    } else if(fut && w){
+      ETo   = w.eto ?? 0.15;
+      mesoP = w.p;
+      const daysAhead = Math.floor((date - today) / 86400000);
+      const useRain   = daysAhead <= PRECIP_FORECAST_DAYS &&
+                        (w.precip_prob ?? 0) >= PRECIP_PROB_THRESHOLD;
+      precip = useRain ? mesoP : 0;
+      src    = 'est';
+
     } else {
-      // Forecast: rolling blend with DOY climatology (replaces monthly ETO_MON)
-      const clim = doyETo(date);
-      ETo = rollingE!=null ? Math.min(0.45, 0.7*rollingE+0.3*clim) : clim;
-      mesoP=0; precip=0; src='est';
+      // No wx data — simulation truncated so this path is rarely reached
+      ETo = 0.15; mesoP = 0; precip = 0; src = 'est';
     }
 
     const Kc=getKc(i);
@@ -1117,6 +1070,12 @@ function runSim(){
     S=Math.min(FC_in,Math.max(0,S));
     const FAW=Math.max(0,Math.min(1,(S-WP_in)/(PAW+1e-9)));
 
+    // If the day appeared OK at dawn but ETc drained soil below threshold by end of day,
+    // update status so bar and label agree — farmer can see why the pivot fires next morning
+    if(rowSt==='✓ OK' && FAW<(1-mad)){
+      rowSt='EOD below MAD'; tCls='tag-lim';
+    }
+
     tableData.push({i,ds,fut,src,precip,mesoP,ETo,Kc,Ks,ETc,R,irr,pivT,
       Z:Zcur,FC_in,WP_in,PAW,Thr_in:Thr,S,FAW,rowSt,rCls,tCls,eff});
   }
@@ -1124,18 +1083,13 @@ function runSim(){
   renderSummary(area,eff,totalNet,irrMode);
   renderTable(irrMode,mad);
   renderCharts(mad);
-  checkStressAlert();
-
-  // Reset AI panel so next open fetches fresh analysis
-  const aiText = document.getElementById('aiText');
-  if(aiText) aiText.textContent='';
 
   document.getElementById('results').style.display='block';
   const modeLabel = irrMode==='none'   ? 'No irrigation'
     : irrMode==='refill' ? 'Refill to FC'
     : `MAD ${Math.round(mad*100)}%`;
   document.getElementById('resultsTitle').textContent=
-    `${crop.name} · ${station} · ${t0.getFullYear()} · ${modeLabel}`;
+    `${crop.name} · ${userLocName} · ${t0.getFullYear()} · ${modeLabel}`;
 }
 
 
@@ -1192,7 +1146,7 @@ function renderTable(irrMode,mad){
       : `<div style="display:inline-flex;align-items:center;gap:5px;">
           <div style="width:38px;height:8px;background:#e2e8f0;border-radius:3px;overflow:hidden;position:relative;">
             <div style="position:absolute;left:0;top:0;width:100%;height:100%;
-              background:linear-gradient(to right,#6565f3 100%);
+              background:#6366f1;
               clip-path:inset(0 ${100-pct}% 0 0);border-radius:3px;"></div>
           </div>
           <span style="font-size:12px;font-weight:600;color:${txtColor};">${pct}%</span>
@@ -1395,46 +1349,11 @@ const CRITICAL_WINDOWS = {
   sunflower:   {s:.46, e:.74, label:'head development and grain fill'},
 };
 
-function toggleAIPanel(){
-  if(!FUNCTION_URL){ return; }
-  const panel = document.getElementById('aiPanel');
-  const open  = panel.style.display !== 'none';
-  if(open){ panel.style.display='none'; return; }
-  panel.style.display='';
-  panel.scrollIntoView({behavior:'smooth', block:'nearest'});
-  if(!document.getElementById('aiText').textContent.trim())
-    fetchAISummary();
-}
-
-function checkStressAlert(){
-  if(!hasResults) return;
-  const btn = document.getElementById('btnAI');
-  if(!btn) return;
-  if(!FUNCTION_URL){ btn.style.display='none'; return; }
-  btn.style.display='';
-
-  const cropKey  = document.getElementById('crop').value;
-  const cw       = CRITICAL_WINDOWS[cropKey];
-  const total    = kcTotal();
-  const today    = new Date(); today.setHours(0,0,0,0);
-  const mad_frac = parseFloat(document.getElementById('mad').value)/100;
-
-  const critStress = tableData.filter(r=>{
-    const ahead = (new Date(r.ds+'T00:00:00')-today)/86400000;
-    const frac  = r.i/total;
-    return ahead>=0 && ahead<=14 && r.FAW<(1-mad_frac) && frac>=cw.s && frac<=cw.e;
-  });
-
-  const alert = critStress.length>0;
-  btn.classList.toggle('ai-alert', alert);
-  btn.textContent = alert
-    ? `⚠ AI Summary (${critStress.length} stress alert${critStress.length>1?'s':''})`
-    : '✦ AI Summary';
-}
+// AI panel is always visible after first Generate — no toggle or stress alert needed
 
 function buildPrompt(){
   const cropKey = document.getElementById('crop').value;
-  const station = document.getElementById('station').value;
+  const station = userLocName;
   const irrMode = document.querySelector('input[name="irrMode"]:checked').value;
   const mad     = parseFloat(document.getElementById('mad').value);
   const soilKey = document.getElementById('soilType').value;
@@ -1445,7 +1364,6 @@ function buildPrompt(){
   const totET    = tableData.reduce((a,r)=>a+r.ETc,0);
   const totalNet = tableData.reduce((a,r)=>a+r.irr,0);
   const irrEv    = tableData.filter(r=>r.irr>0).length;
-  const maxETc   = Math.max(...tableData.map(r=>r.ETc));
 
   const eff  = (parseFloat(document.getElementById('sprinkEff').value)||85)/100;
   const gpm  = parseFloat(document.getElementById('pumpGPM').value)||800;
@@ -1453,7 +1371,6 @@ function buildPrompt(){
   const adRaw= document.getElementById('appDepth').value;
   const appD = adRaw==='custom'?(parseFloat(document.getElementById('appDepthCustom').value)||1):parseFloat(adRaw);
   const revD = (area*appD*27154)/(gpm*eff*60*24);
-  const canKeep = (maxETc>0 ? appD/maxETc : 999) >= revD;
 
   const today = new Date(); today.setHours(0,0,0,0);
   const t0    = new Date(tableData[0].ds+'T00:00:00');
@@ -1461,26 +1378,29 @@ function buildPrompt(){
   const {li,ld,lm,ll} = kc;
   const total = li+ld+lm+ll;
   const stage = dayN<li?'Initial':dayN<li+ld?'Development':dayN<li+ld+lm?'Mid-season':'Late';
+  const lastDs = tableData[tableData.length-1].ds;
 
   const upcoming = tableData.filter(r=>{
     const ahead=(new Date(r.ds+'T00:00:00')-today)/86400000;
     return ahead>=0 && ahead<14;
   });
 
+  // Critical stage stress — only relevant when the forecast window overlaps it
   const critStress = upcoming.filter(r=>{
     const frac=r.i/total;
     return r.FAW<(1-mad/100) && frac>=cw.s && frac<=cw.e;
   });
+  const inCritWindow = upcoming.some(r=>{ const f=r.i/total; return f>=cw.s&&f<=cw.e; });
 
   const upcomingLines = upcoming.map(r=>{
     const frac=r.i/total;
-    const crit = frac>=cw.s&&frac<=cw.e?' ← CRITICAL STAGE':'';
+    const crit = (inCritWindow && frac>=cw.s&&frac<=cw.e)?' ← CRITICAL STAGE':'';
     const flag = r.irr>0?' — IRRIGATE':r.FAW<(1-mad/100)?' — STRESS'+crit:'';
     return `  ${r.ds}  ETo ${r.ETo.toFixed(3)} in  ETc ${r.ETc.toFixed(3)} in  ${(r.FAW*100).toFixed(0)}% avail.${flag}`;
   }).join('\n')||'  No upcoming data';
 
   const stressAlert = critStress.length>0
-    ? `⚠ CRITICAL: ${critStress.length} stress day(s) projected during ${cw.label} — the most yield-sensitive period.`
+    ? `⚠ CRITICAL: ${critStress.length} stress day(s) during ${cw.label} within forecast window.`
     : '';
 
   const irrLabel = {
@@ -1489,26 +1409,21 @@ function buildPrompt(){
     none:'no irrigation (dryland)'
   }[irrMode]||irrMode;
 
-  return `You are a practical irrigation advisor helping a Kansas farmer using a scheduling tool. Be concise and actionable. Plain language only — no jargon. Maximum 5–6 sentences. Never recommend specific "Days ahead" numbers. Never suggest the farmer change their pump, well, or irrigation hardware — they know their system's limits.
-
-SEASON:
-Crop: ${crop.name} | Station: ${station}, KS | Planting: ${tableData[0].ds}
+  return `SEASON:
+Crop: ${crop.name} | Location: ${station} | Planting: ${tableData[0].ds}
 Soil: ${soilKey} | Strategy: ${irrLabel}
-Rainfall projected: ${totP.toFixed(1)} in | Crop ET: ${totET.toFixed(1)} in | Net irrigation: ${totalNet.toFixed(1)} in (${irrEv} starts)
-Pivot: ${appD} in/pass, ${revD.toFixed(1)}-day revolution — ${canKeep?'can keep up at peak':'may struggle to keep up at peak demand of '+maxETc.toFixed(3)+' in/day'}
-Growth stages: Initial d0–${li} | Dev d${li}–${li+ld} | Mid d${li+ld}–${li+ld+lm} | Late d${li+ld+lm}–${total}
-Now: Day ${dayN} (${stage}) | Critical window: ${cw.label} (d${Math.round(cw.s*total)}–${Math.round(cw.e*total)})
+Rainfall: ${totP.toFixed(1)} in | Crop ET: ${totET.toFixed(1)} in | Net irrigation: ${totalNet.toFixed(1)} in (${irrEv} starts)
+Pivot: ${appD} in/pass, ${revD.toFixed(1)}-day revolution
+Current stage: ${stage} (Day ${dayN} of ${total}) | Data window: ${tableData[0].ds} → ${lastDs}
+${inCritWindow ? `⚠ Forecast overlaps critical period: ${cw.label}` : ''}
 
-NEXT 14 DAYS:
+DATA (planting to end of forecast only):
 ${upcomingLines}
 ${stressAlert}
 
-Provide: (1) 2–3 sentence plain-English outlook. (2) ${
-  critStress.length>0
-    ? 'What specific irrigation action the farmer should take right now to reduce stress risk during the critical window.'
-    : !canKeep
-    ? 'Advise on irrigation timing strategy to best manage the peak demand period — focus on scheduling, not on hardware changes.'
-    : 'One practical tip for the coming weeks.'
+${critStress.length>0
+  ? 'Recommend a specific irrigation action to reduce stress risk within the forecast window.'
+  : 'Provide one practical observation strictly within the data window shown above.'
 }`;
 }
 
@@ -1533,11 +1448,76 @@ async function fetchAISummary(){
       .map(p => `<p>${p.replace(/\n/g,'<br>')}</p>`)
       .join('');
     textEl.innerHTML = html;
+    document.getElementById('aiStaleNote').style.display='none';
+    document.getElementById('btnAIRefresh').style.display='none';
   } catch(e){
     textEl.textContent=`Could not reach AI service: ${e.message}.`;
   } finally {
     loadEl.style.display='none';
   }
+}
+
+
+// ═══════════════  MAP MODAL  ══════════════════════
+
+let leafletMap = null;
+let leafletMarker = null;
+let modalLat = userLat;
+let modalLng = userLng;
+
+function updateLocDisplay(){
+  document.getElementById('locName').textContent   = userLocName;
+  document.getElementById('locCoords').textContent =
+    `${userLat.toFixed(4)}° N, ${Math.abs(userLng).toFixed(4)}° W`;
+}
+
+function openMapModal(){
+  const modal = document.getElementById('mapModal');
+  modal.style.display = 'flex';
+  modalLat = userLat;
+  modalLng = userLng;
+  updateModalCoordDisplay(modalLat, modalLng);
+
+  if(!leafletMap){
+    leafletMap = L.map('leafletMap').setView([modalLat, modalLng], 9);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+      attribution:'© OpenStreetMap contributors', maxZoom:18
+    }).addTo(leafletMap);
+    leafletMarker = L.marker([modalLat, modalLng], {draggable:true}).addTo(leafletMap);
+    leafletMarker.on('dragend', e => {
+      const p = e.target.getLatLng();
+      modalLat = +p.lat.toFixed(6); modalLng = +p.lng.toFixed(6);
+      updateModalCoordDisplay(modalLat, modalLng);
+    });
+    leafletMap.on('click', e => {
+      modalLat = +e.latlng.lat.toFixed(6); modalLng = +e.latlng.lng.toFixed(6);
+      leafletMarker.setLatLng([modalLat, modalLng]);
+      updateModalCoordDisplay(modalLat, modalLng);
+    });
+  } else {
+    leafletMap.setView([modalLat, modalLng], 9);
+    leafletMarker.setLatLng([modalLat, modalLng]);
+    setTimeout(()=>leafletMap.invalidateSize(), 50);
+  }
+}
+
+function updateModalCoordDisplay(lat, lng){
+  document.getElementById('modalCoords').textContent =
+    `Selected: ${lat.toFixed(4)}° N, ${Math.abs(lng).toFixed(4)}° W`;
+}
+
+function closeMapModal(){
+  document.getElementById('mapModal').style.display = 'none';
+}
+
+function applyLocation(){
+  userLat = modalLat;
+  userLng = modalLng;
+  userLocName = `${userLat.toFixed(3)}° N, ${Math.abs(userLng).toFixed(3)}° W`;
+  wxCache.cacheKey = null;
+  updateLocDisplay();
+  closeMapModal();
+  if(hasResults) recompute();
 }
 
 
@@ -1564,5 +1544,22 @@ function downloadCSV(){
   }).click();
 }
 </script>
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<!-- Map modal -->
+<div id="mapModal" class="map-modal-overlay" style="display:none;">
+  <div class="map-modal-box">
+    <h3>Select Field Location</h3>
+    <p style="font-size:13px;color:var(--mut);margin:0 0 8px;">Click anywhere on the map or drag the marker to your field location.</p>
+    <div id="leafletMap"></div>
+    <div class="map-coords" id="modalCoords"></div>
+    <div class="map-modal-btns">
+      <button class="btn-sm" onclick="closeMapModal()">Cancel</button>
+      <button class="btn-go" onclick="applyLocation()">Use This Location</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
