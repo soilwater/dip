@@ -93,8 +93,9 @@ select:focus,input:focus{outline:none;border-color:var(--g);box-shadow:0 0 0 2px
 #aiText p{margin-bottom:0.6em;}
 #aiLoading{font-size:14px;color:var(--mut);font-style:italic;padding:4px 0;}
 /* ── Buttons ── */
-.btn-go{background:var(--g);color:#fff;border:none;border-radius:6px;padding:11px 26px;font-size:16px;font-family:inherit;font-weight:600;cursor:pointer;}
-.btn-go:hover{background:#15803d;}
+.btn-go{background:var(--g);color:#fff;border:2px solid var(--g);border-radius:6px;padding:11px 26px;font-size:16px;font-family:inherit;font-weight:600;cursor:pointer;}
+.btn-go:hover{background:#15803d;border-color:#15803d;}
+.btn-go.loading{background:#fff;color:var(--g);border:2px solid var(--g);cursor:default;}
 .btn-sm{background:#fff;color:var(--mut);border:1.5px solid var(--bdr);border-radius:4px;padding:6px 14px;font-size:14px;font-family:inherit;cursor:pointer;}
 .btn-sm:hover{background:var(--sllt);}
 
@@ -315,7 +316,7 @@ td.rain-edited::after{content:'●';font-size:6px;color:var(--teal);vertical-ali
 
     </div><!-- /left col -->
 
-    <!-- RIGHT: Soil + Center Pivot -->
+    <!-- RIGHT: Soil + Irrigation system -->
     <div class="setup-col">
 
       <div class="grp grp-soil">
@@ -352,7 +353,7 @@ td.rain-edited::after{content:'●';font-size:6px;color:var(--teal);vertical-ali
       </div>
 
       <div class="grp grp-pvt">
-        <div class="gtitle">Center Pivot</div>
+        <div class="gtitle">Irrigation System</div>
         <div class="fg fg-2" style="margin-bottom:10px;">
           <div>
             <label>Field Size (ac)</label>
@@ -539,11 +540,15 @@ const CROPS = {
 };
 
 const SOILS = {
-  sand:      {FC:10,WP:4, CN:72}, loamySand:{FC:14,WP:6, CN:74},
-  sandyLoam: {FC:20,WP:9, CN:78}, loam:     {FC:28,WP:13,CN:82},
-  siltLoam:  {FC:31,WP:14,CN:84}, clayLoam: {FC:37,WP:20,CN:86},
-  sandyClay: {FC:35,WP:22,CN:86}, siltyClay:{FC:40,WP:27,CN:88},
-  clay:      {FC:42,WP:29,CN:88}
+  sand:      {FC:15.4,WP: 3.5,CN:72},  // PTF (no obs)
+  loamySand: {FC:18.6,WP: 6.3,CN:74},  // PTF (no obs)
+  sandyLoam: {FC:21.3,WP: 7.9,CN:78},  // observed n=15
+  loam:      {FC:27.4,WP:11.6,CN:82},  // PTF (n=3 too few)
+  siltLoam:  {FC:33.7,WP:15.2,CN:84},  // observed n=38
+  clayLoam:  {FC:34.3,WP:19.9,CN:86},  // observed n=18
+  sandyClay: {FC:31.6,WP:21.3,CN:86},  // PTF (no obs)
+  siltyClay: {FC:40.6,WP:25.0,CN:88},  // observed n=27
+  clay:      {FC:43.6,WP:30.3,CN:88},  // observed n=5
 };
 
 
@@ -925,6 +930,100 @@ async function fetchWeatherOpenMeteo(lat, lng, startDate, endDate) {
 }
 
 
+// ═══════════════  PIVOT SPINNER  ══════════════════
+
+function createPivotSpinner(size, ringColor){
+  const dpr = window.devicePixelRatio || 1;
+  const c = document.createElement('canvas');
+  c.width  = size * dpr;
+  c.height = size * dpr;
+  c.style.width  = size + 'px';
+  c.style.height = size + 'px';
+  c.style.flexShrink = '0';
+  const ctx = c.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const cx = size/2, cy = size/2;
+  const R  = size/2 - 1.5;
+  const ri = R * 0.58;
+  const tk = R * 0.20;
+  const dur = 2000;
+  let start = null, running = true, raf;
+
+  function frame(ts){
+    if(!running) return;
+    if(!start) start = ts;
+    const angle = ((ts - start) % dur) / dur * Math.PI * 2;
+
+    ctx.clearRect(0, 0, size, size);
+
+    // Wedge
+    if(angle > 0.01){
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, R, -Math.PI/2, -Math.PI/2 + angle, false);
+      ctx.closePath();
+      ctx.fillStyle = '#dcfce7';
+      ctx.fill();
+    }
+
+    // Outer ring
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, 0, Math.PI*2);
+    ctx.strokeStyle = ringColor;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Inner ring
+    ctx.globalAlpha = 0.4;
+    ctx.beginPath();
+    ctx.arc(cx, cy, ri, 0, Math.PI*2);
+    ctx.strokeStyle = ringColor;
+    ctx.lineWidth = 0.7;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    // 4 ticks N E S W
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = ringColor;
+    ctx.lineWidth = 1.2;
+    [[cx,cy-R,cx,cy-R+tk],[cx+R,cy,cx+R-tk,cy],
+     [cx,cy+R,cx,cy+R-tk],[cx-R,cy,cx-R+tk,cy]].forEach(([x1,y1,x2,y2])=>{
+      ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+    });
+
+    // Arm
+    const ax = cx + R * Math.sin(angle);
+    const ay = cy - R * Math.cos(angle);
+    ctx.beginPath();
+    ctx.moveTo(cx, cy); ctx.lineTo(ax, ay);
+    ctx.strokeStyle = '#16a34a';
+    ctx.lineWidth = 1.8;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+
+    // Center dot
+    ctx.beginPath();
+    ctx.arc(cx, cy, R * 0.18, 0, Math.PI*2);
+    ctx.fillStyle = '#16a34a';
+    ctx.fill();
+
+    // Tip open circle
+    ctx.beginPath();
+    ctx.arc(ax, ay, R * 0.10, 0, Math.PI*2);
+    ctx.strokeStyle = '#16a34a';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    raf = requestAnimationFrame(frame);
+  }
+
+  raf = requestAnimationFrame(frame);
+  c._stop = () => { running = false; cancelAnimationFrame(raf); };
+  return c;
+}
+
+
 // ═══════════════  SIMULATION  ═════════════════════
 
 let cTop=null, cBot=null, tableData=[];
@@ -939,7 +1038,16 @@ async function generateSchedule(){
 
   const btn = document.getElementById('btnGenerate');
   btn.disabled = true;
-  btn.textContent = '⏳ Requesting data…';
+  btn.classList.add('loading');
+
+  // Build animated pivot spinner
+  const spinner = createPivotSpinner(20, '#16a34a');
+  btn.innerHTML = '';
+  btn.style.display = 'inline-flex';
+  btn.style.alignItems = 'center';
+  btn.style.gap = '8px';
+  btn.appendChild(spinner);
+  btn.appendChild(Object.assign(document.createElement('span'), {textContent: 'Requesting data…'}));
 
   try {
     const key = omCacheKey(userLat, userLng);
@@ -966,8 +1074,13 @@ async function generateSchedule(){
       }
     }
   } finally {
+    spinner._stop();
     btn.disabled = false;
-    btn.textContent = '▶ Generate Schedule';
+    btn.classList.remove('loading');
+    btn.style.display = '';
+    btn.style.alignItems = '';
+    btn.style.gap = '';
+    btn.innerHTML = '▶ Generate Schedule';
   }
 }
 
