@@ -1021,7 +1021,15 @@ function runSim(){
     const ds=date.toISOString().split('T')[0], fut=date>today;
 
     const Zprev=i>0?getZ(i-1,crop,Zm,dynamic):Z0, Zcur=getZ(i,crop,Zm,dynamic);
-    if(Zcur>Zprev) S+=(Zcur-Zprev)*soil.FC/100;
+    if(Zcur>Zprev){
+      // New root volume added at current soil water fraction, not at FC.
+      // Adding at FC was artificially resetting the MAD trigger each day during rapid root growth.
+      const WP_prev = soil.WP*Zprev/100;
+      const FC_prev = soil.FC*Zprev/100;
+      const PAW_prev = FC_prev - WP_prev;
+      const curFAW = PAW_prev>0 ? Math.max(0,Math.min(1,(S-WP_prev)/PAW_prev)) : 0.75;
+      S += (Zcur-Zprev) * (soil.WP/100 + curFAW*(soil.FC-soil.WP)/100);
+    }
 
     const FC_in=soil.FC*Zcur/100, WP_in=soil.WP*Zcur/100;
     const PAW=FC_in-WP_in, Thr=WP_in+(1-mad)*PAW;
