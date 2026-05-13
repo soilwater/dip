@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="420" height="68" viewBox="0 0 420 68" role="img">
+<title>Daily Irrigation Planner</title>
+<desc>Center pivot mark with concentric rings and horizontal wordmark</desc>
+<defs><clipPath id="hc"><circle cx="34" cy="34" r="30"/></clipPath></defs>
+<g clip-path="url(#hc)">
+  <path d="M 34 34  L 34 4  A 30 30 0 0 1 60 51 Z" fill="#dcfce7"/>
+</g>
+<circle cx="34" cy="34" r="30" fill="none" stroke="#16a34a" stroke-width="2"/>
+<circle cx="34" cy="34" r="17" fill="none" stroke="#16a34a" stroke-width="1" stroke-opacity="0.4"/>
+<line x1="34" y1="4"  x2="34" y2="9"  stroke="#16a34a" stroke-width="1.8" stroke-linecap="round"/>
+<line x1="64" y1="34" x2="59" y2="34" stroke="#16a34a" stroke-width="1.8" stroke-linecap="round"/>
+<line x1="34" y1="64" x2="34" y2="59" stroke="#16a34a" stroke-width="1.8" stroke-linecap="round"/>
+<line x1="4"  y1="34" x2="9"  y2="34" stroke="#16a34a" stroke-width="1.8" stroke-linecap="round"/>
+<line x1="34" y1="34" x2="60" y2="51" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round"/>
+<circle cx="34" cy="34" r="3.5" fill="#16a34a"/>
+<circle cx="60" cy="51" r="3" fill="none" stroke="#16a34a" stroke-width="2"/>
+<text x="78" y="29" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-size="20" font-weight="500" fill="#0f172a">Daily Irrigation Planner</text>
+<text x="79" y="46" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-size="10" font-weight="400" fill="#64748b" letter-spacing="1.5">SOIL WATER PROCESSES LAB · K-STATE</text>
+<line x1="79" y1="54" x2="418" y2="54" stroke="#e2e8f0" stroke-width="0.8"/>
+</svg>
