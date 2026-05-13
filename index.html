@@ -236,6 +236,20 @@ td.rain-edited::after{content:'●';font-size:6px;color:var(--teal);vertical-ali
   thead{display:table-header-group;}
   tbody tr{page-break-inside:avoid;}
 }
+/* ── About modal ── */
+#aboutModal .map-modal-box{width:480px;max-height:85vh;overflow-y:auto;}
+.about-section{margin-bottom:20px;}
+.about-section h4{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin:0 0 10px;padding-bottom:6px;border-bottom:1px solid var(--bdr);}
+.about-dl{display:flex;flex-direction:column;gap:8px;}
+.about-row{display:grid;grid-template-columns:130px 1fr;gap:10px;font-size:14px;line-height:1.6;}
+.about-row dt{font-weight:600;color:var(--txt);padding-top:1px;}
+.about-row dd{color:var(--mut);margin:0;}
+.about-row dd a{color:var(--g);text-decoration:none;}
+.about-row dd a:hover{text-decoration:underline;}
+.license-box{background:var(--sllt);border-left:3px solid var(--g);border-radius:0 4px 4px 0;padding:12px 14px;font-size:13px;line-height:1.75;color:var(--txt);}
+.license-box p{margin-bottom:8px;}
+.license-box p:last-child{margin-bottom:0;color:var(--mut);}
+
 /* ── Map modal ── */
 .map-modal-overlay{position:fixed;inset:0;z-index:999;background:rgba(15,23,42,.55);display:flex;align-items:center;justify-content:center;}
 .map-modal-box{background:#fff;border-radius:10px;padding:20px;width:580px;max-width:96vw;box-shadow:0 8px 32px rgba(0,0,0,.18);}
@@ -480,6 +494,9 @@ td.rain-edited::after{content:'●';font-size:6px;color:var(--teal);vertical-ali
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-top:12px;">
       <p class="note" style="margin:0;flex:1;">
         Soil Water Processes Lab | Agronomy | Kansas State University
+        &nbsp;·&nbsp;
+        <a href="#" onclick="document.getElementById('aboutModal').style.display='flex';return false;"
+           style="color:var(--mut);text-decoration:underline;font-size:13px;">Attributions &amp; License</a>
       </p>
       <button id="resetRainBtn" class="btn-sm no-print" onclick="resetAllRain()" style="display:none;white-space:nowrap;">↺ Restore original rain</button>
     </div>
@@ -1557,6 +1574,83 @@ function downloadCSV(){
     <div class="map-modal-btns">
       <button class="btn-sm" onclick="closeMapModal()">Cancel</button>
       <button class="btn-go" onclick="applyLocation()">Use This Location</button>
+    </div>
+  </div>
+</div>
+
+<!-- About / Attributions modal -->
+<div id="aboutModal" class="map-modal-overlay" style="display:none;" onclick="if(event.target===this)this.style.display='none'">
+  <div class="map-modal-box">
+    <h3>Attributions &amp; License</h3>
+
+    <div class="about-section">
+      <h4>Data Sources</h4>
+      <dl class="about-dl">
+        <div class="about-row">
+          <dt>Weather &amp; ETo</dt>
+          <dd><a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a> — FAO-56 Penman-Monteith ETo and forecast weather. Free tier for non-commercial use (CC BY 4.0). Commercial use requires a paid subscription.</dd>
+        </div>
+        <div class="about-row">
+          <dt>Map tiles</dt>
+          <dd><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors — Open Database License (ODbL).</dd>
+        </div>
+      </dl>
+    </div>
+
+    <div class="about-section">
+      <h4>Libraries</h4>
+      <dl class="about-dl">
+        <div class="about-row">
+          <dt>Leaflet 1.9.4</dt>
+          <dd>Interactive maps — <a href="https://leafletjs.com" target="_blank" rel="noopener">leafletjs.com</a> — BSD 2-Clause.</dd>
+        </div>
+        <div class="about-row">
+          <dt>Chart.js 4.4.1</dt>
+          <dd>Data visualization — <a href="https://www.chartjs.org" target="_blank" rel="noopener">chartjs.org</a> — MIT.</dd>
+        </div>
+      </dl>
+    </div>
+
+    <div class="about-section">
+      <h4>Methods</h4>
+      <dl class="about-dl">
+        <div class="about-row">
+          <dt>ET model</dt>
+          <dd>FAO-56 Penman-Monteith — Allen et al. (1998), FAO Irrigation and Drainage Paper No. 56.</dd>
+        </div>
+        <div class="about-row">
+          <dt>Runoff</dt>
+          <dd>SCS Curve Number — USDA National Engineering Handbook.</dd>
+        </div>
+        <div class="about-row">
+          <dt>Kc curves</dt>
+          <dd>FAO-56 crop coefficients adapted for Kansas growing conditions.</dd>
+        </div>
+      </dl>
+    </div>
+
+    <div class="about-section">
+      <h4>AI</h4>
+      <dl class="about-dl">
+        <div class="about-row">
+          <dt>Summaries</dt>
+          <dd>Claude Haiku 4.5 via DigitalOcean GenAI — <a href="https://www.anthropic.com" target="_blank" rel="noopener">anthropic.com</a>.</dd>
+        </div>
+      </dl>
+    </div>
+
+    <div class="about-section">
+      <h4>License</h4>
+      <div class="license-box">
+        <p>© 2025 Soil Water Processes Lab, Department of Agronomy, Kansas State University.</p>
+        <p>Free for non-commercial, academic, and research use with attribution. This includes educational use, university extension programs, and personal experimentation.</p>
+        <p>Commercial use — including use by farming operations, agricultural consultants, or any for-profit purpose — requires a written license agreement. Contact the Soil Water Processes Lab at Kansas State University.</p>
+        <p>Note: commercial use also requires a paid Open-Meteo subscription in accordance with their terms of service.</p>
+      </div>
+    </div>
+
+    <div class="map-modal-btns">
+      <button class="btn-go" onclick="document.getElementById('aboutModal').style.display='none'">Close</button>
     </div>
   </div>
 </div>
