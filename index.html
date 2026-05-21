@@ -564,15 +564,15 @@ const PRECIP_PROB_THRESHOLD= 50;   // % probability required to include forecast
 // Ldev is long (120 d) to accommodate winter dormancy; Kc rises linearly through it,
 // which is a simplification — actual Kc stalls near Kc_ini during dormancy.
 const CROPS = {
-  corn:        {name:"Corn",         Kc_ini:.30,Kc_mid:1.20,Kc_end:.60,stages:[30,40,50,30],root:48,plantDate:'05-01'},
+  corn:        {name:"Corn",         Kc_ini:.30,Kc_mid:1.20,Kc_end:.50,stages:[25,35,50,30],root:48,plantDate:'05-01'},
   soybean:     {name:"Soybean",      Kc_ini:.40,Kc_mid:1.15,Kc_end:.50,stages:[20,35,60,25],root:36,plantDate:'05-15'},
-  sorghum:     {name:"Grain Sorghum",Kc_ini:.30,Kc_mid:1.00,Kc_end:.55,stages:[20,35,40,30],root:48,plantDate:'06-01'},
-  // Winter wheat: Oct 15 planting → ~250 days to ~Jun 22 harvest.
-  // Lini=135 covers emergence + entire winter dormancy (Oct 15 → late Feb, Kc stays low ≈ 0.30).
+  sorghum:     {name:"Grain Sorghum",Kc_ini:.30,Kc_mid:1.00,Kc_end:.55,stages:[20,35,40,30],root:48,plantDate:'05-20'},
+  // Winter wheat: Oct 1 planting → ~250 days to ~Jun 8 harvest.
+  // Lini=135 covers emergence + entire winter dormancy (Oct 1 → late Feb, Kc stays low ≈ 0.10).
   // Ldev=45 covers rapid spring green-up (Mar → mid-Apr).
-  // Lmid=55 covers heading and grain fill (mid-Apr → Jun 10).
-  // Llate=15 covers rapid dry-down to harvest (Jun 10 → Jun 25).
-  winterWheat: {name:"Winter Wheat", Kc_ini:.10,Kc_mid:1.15,Kc_end:.25,stages:[135,45,55,15],root:48,plantDate:'10-15'},
+  // Lmid=55 covers heading and grain fill (mid-Apr → Jun 1).
+  // Llate=15 covers rapid dry-down to harvest (Jun 1 → Jun 16).
+  winterWheat: {name:"Winter Wheat", Kc_ini:.10,Kc_mid:1.15,Kc_end:.25,stages:[135,45,55,15],root:48,plantDate:'10-10'},
   sunflower:   {name:"Sunflower",    Kc_ini:.35,Kc_mid:1.10,Kc_end:.35,stages:[25,35,45,25],root:48,plantDate:'05-20'},
 };
 
