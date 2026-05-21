@@ -10,13 +10,15 @@
 <style>
 :root {
   --mw:   920px;
-  --g:    #16a34a;
-  --glt:  #f0fdf4;
-  --gbdr: #bbf7d0;
+  --g:    #5816a3;
+  --g-hov:#4a12a0;
+  --g-soft:rgba(88,22,163,.10);
+  --glt:  #f3e8ff;
+  --gbdr: #ddd6fe;
   --amb:  #d97706;
   --amlt: #fffbeb;
   --ambdr:#fde68a;
-  --pvlt: #f5f3ff;
+  --pvlt: #fcfcfc;
   --pvbdr:#e9d5ff;
   --red:  #dc2626;
   --bdr:  #e2e8f0;
@@ -26,13 +28,18 @@
   --shd:  0 1px 3px rgba(0,0,0,.08);
   --teal: #0d9488;
   --tealt:rgba(13,148,136,.09);
+  --obs: #16a34a;
+  --fut: #2563eb;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;font-size:16px;background:#eef2f7;color:var(--txt);line-height:1.5;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;font-size:16px;background:#eef2f7;color:var(--txt);line-height:1.5;font-feature-settings:'tnum' 1;-webkit-font-smoothing:antialiased;}
 
 /* ── Header ── */
 header{background:#fff;border-top:3px solid var(--g);border-bottom:1px solid var(--bdr);}
-.header-inner{max-width:var(--mw);margin:0 auto;padding:14px;display:flex;align-items:baseline;gap:14px;}
+.header-inner{max-width:var(--mw);margin:0 auto;padding:14px;display:flex;align-items:center;justify-content:space-between;gap:14px;}
+.header-right{font-size:13px;color:var(--mut);}
+.header-right a{color:var(--mut);text-decoration:none;}
+.header-right a:hover{color:var(--txt);}
 
 /* ── Wrapper ── */
 .wrap{max-width:var(--mw);margin:0 auto;padding:16px 14px 52px;}
@@ -59,8 +66,12 @@ label{display:block;font-size:14px;font-weight:600;color:var(--mut);margin-botto
 select,input[type=date],input[type=number]{
   width:100%;padding:9px 11px;font-size:16px;font-family:inherit;
   border:1.5px solid var(--bdr);border-radius:5px;background:#fff;color:var(--txt);
+  font-variant-numeric:tabular-nums;
+  transition:border-color .12s,box-shadow .12s;
 }
-select:focus,input:focus{outline:none;border-color:var(--g);box-shadow:0 0 0 2px rgba(22,163,74,.15);}
+select:hover,input:hover{border-color:#d1d5db;}
+select:focus,input:focus{outline:none;border-color:var(--g);box-shadow:0 0 0 2px var(--g-soft);}
+.radio-row input[type=radio]{accent-color:var(--g);}
 
 .radio-row{display:flex;gap:14px;align-items:center;flex-wrap:wrap;padding:4px 0;}
 .radio-row label{display:flex;align-items:center;gap:6px;font-size:15px;font-weight:500;color:var(--txt);margin:0;white-space:nowrap;}
@@ -70,15 +81,25 @@ select:focus,input:focus{outline:none;border-color:var(--g);box-shadow:0 0 0 2px
 .seg{display:flex;border:1.5px solid var(--bdr);border-radius:5px;overflow:hidden;margin-top:2px;}
 .seg button{flex:1;padding:9px 4px;font-size:15px;font-family:inherit;font-weight:600;border:none;border-right:1.5px solid var(--bdr);background:#fff;color:var(--mut);cursor:pointer;transition:background .12s,color .12s;}
 .seg button:last-child{border-right:none;}
+.seg button:hover{background:var(--sllt);color:var(--txt);}
 .seg button.on{background:var(--g);color:#fff;}
+.seg button.on:hover{background:var(--g-hov);}
 
 /* ── Kc editor ── */
 .kc-wrap{margin-top:12px;flex:1;display:flex;flex-direction:column;}
 .kc-hdr{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;}
 .kc-hdr label{margin:0;font-size:14px;}
 .kc-total{font-size:13px;color:var(--mut);}
-#kcSvg{display:block;width:100%;flex:1;min-height:160px;border:1.5px solid var(--gbdr);border-radius:6px;background:#fafafa;touch-action:none;}
+#kcSvg{display:block;width:100%;flex:1;min-height:160px;border:1.5px solid #ebebeb;border-radius:6px;background:#fafafa;touch-action:none;}
 .kc-hint{font-size:12px;color:var(--mut);margin-top:5px;}
+
+/* ── Revolution time display ── */
+.rev-display{font-size:13px;color:var(--mut);font-variant-numeric:tabular-nums;padding:7px 10px;background:var(--sllt);border-radius:5px;border:1px solid var(--bdr);}
+.rev-display strong{color:var(--txt);font-weight:600;}
+
+/* ── Chart card header ── */
+.chart-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+.chart-hdr .ctitle{margin:0;border:none;padding:0;}
 
 /* ── Chart mode toggle ── */
 .chart-toggle{display:flex;border:1.5px solid var(--bdr);border-radius:4px;overflow:hidden;}
@@ -86,18 +107,22 @@ select:focus,input:focus{outline:none;border-color:var(--g);box-shadow:0 0 0 2px
 .chart-toggle button:last-child{border-right:none;}
 .chart-toggle button.on{background:var(--g);color:#fff;}
 
-/* ── AI Summary panel ── */
-#aiPanel{background:#fafdf7;border-color:var(--gbdr);}
+/* ── AI panel ── */
+#aiPanel{background:var(--glt);border-color:var(--gbdr);}
 #aiText{font-size:15px;line-height:1.75;color:var(--txt);}
 #aiText strong{color:var(--txt);font-weight:700;}
 #aiText p{margin-bottom:0.6em;}
 #aiLoading{font-size:14px;color:var(--mut);font-style:italic;padding:4px 0;}
+.ai-hdr{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin-bottom:10px;}
 /* ── Buttons ── */
-.btn-go{background:var(--g);color:#fff;border:2px solid var(--g);border-radius:6px;padding:11px 26px;font-size:16px;font-family:inherit;font-weight:600;cursor:pointer;}
-.btn-go:hover{background:#15803d;border-color:#15803d;}
+.btn-go{background:var(--g);color:#fff;border:2px solid var(--g);border-radius:6px;padding:11px 26px;font-size:16px;font-family:inherit;font-weight:600;cursor:pointer;transition:background .12s,border-color .12s;}
+.btn-go:hover{background:var(--g-hov);border-color:var(--g-hov);}
 .btn-go.loading{background:#fff;color:var(--g);border:2px solid var(--g);cursor:default;}
-.btn-sm{background:#fff;color:var(--mut);border:1.5px solid var(--bdr);border-radius:4px;padding:6px 14px;font-size:14px;font-family:inherit;cursor:pointer;}
-.btn-sm:hover{background:var(--sllt);}
+.btn-go:disabled{opacity:.7;}
+.btn-sm{background:#fff;color:var(--mut);border:1.5px solid var(--bdr);border-radius:4px;padding:6px 14px;font-size:14px;font-family:inherit;cursor:pointer;transition:border-color .12s,background .12s;}
+.btn-sm:hover{border-color:#d1d5db;background:var(--sllt);}
+.action-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:6px;}
+.action-row .hint{font-size:13px;color:var(--mut);}
 
 /* ── Results header (title + action buttons) ── */
 .results-hdr{
@@ -131,16 +156,18 @@ details[open] summary.analytics-toggle::before{transform:rotate(90deg);}
 .ct-bot{position:relative;height:115px;margin-top:8px;}
 /* ── Table ── */
 .tscroll{overflow-x:auto;}
-table{border-collapse:collapse;width:100%;font-size:14px;}
-thead th{background:var(--sllt);color:var(--mut);padding:7px 8px;text-align:center;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;border-bottom:2px solid var(--bdr);white-space:nowrap;}
+table{border-collapse:collapse;width:100%;font-size:14px;font-variant-numeric:tabular-nums;}
+thead th{background:var(--sllt);color:var(--mut);padding:7px 8px;text-align:right;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--bdr);white-space:nowrap;}
 thead th.tl{text-align:left;}
-tbody td{padding:6px 8px;text-align:center;border-bottom:1px solid #f1f5f9;white-space:nowrap;vertical-align:middle;}
+tbody td{padding:6px 8px;text-align:right;border-bottom:1px solid #f1f5f9;white-space:nowrap;vertical-align:middle;}
 tbody td.tl{text-align:left;}
 tbody tr:hover{background:#f8fafc!important;}
+td.rain-cell{cursor:text;}
+td.rain-cell:hover{background:var(--g-soft)!important;}
 
 .r-irr{background:#fff7ed;} .r-run{background:#f7fbff;} .r-str{background:#fef3c7;}
-tr.obs td:first-child{border-left:3px solid #bbf7d0;}
-tr.fut td:first-child{border-left:3px solid #bae6fd;}
+tr.obs td:first-child{border-left:3px solid var(--obs);}
+tr.fut td:first-child{border-left:3px solid var(--fut);}
 tr.fut td{color:#64748b;} tr.fut .tag{opacity:1;}
 
 .tag{display:inline-block;padding:3px 9px;border-radius:3px;font-size:13px;font-weight:700;white-space:nowrap;}
@@ -150,8 +177,6 @@ tr.fut td{color:#64748b;} tr.fut .tag{opacity:1;}
 .tag-run{background:#e0f2fe;    color:#0369a1;}
 .tag-str{background:var(--amlt);color:var(--amb);}
 
-/* ── Editable rain cells ── */
-td.rain-cell{cursor:text;}
 td.rain-edited{background:var(--tealt)!important;position:relative;}
 td.rain-edited::after{content:'●';font-size:6px;color:var(--teal);vertical-align:super;margin-left:2px;}
 .rain-input{width:58px;padding:3px 5px;font-size:14px;font-family:inherit;border:1.5px solid var(--g);border-radius:3px;text-align:center;background:#fff;}
@@ -262,6 +287,9 @@ td.rain-edited::after{content:'●';font-size:6px;color:var(--teal);vertical-ali
 <header>
   <div class="header-inner">
     <img src="logo-header.svg" alt="Daily Irrigation Planner" height="54">
+    <div class="header-right">
+      <a href="#" onclick="document.getElementById('aboutModal').style.display='flex';return false;">About</a>
+    </div>
   </div>
 </header>
 
@@ -278,7 +306,7 @@ td.rain-edited::after{content:'●';font-size:6px;color:var(--teal);vertical-ali
         <div class="gtitle">Location</div>
         <div style="display:flex;align-items:center;gap:8px;">
           <span id="locName" style="flex:1;font-size:15px;font-weight:500;color:var(--txt);">Manhattan, KS</span>
-          <button type="button" class="btn-sm" onclick="openMapModal()">📍 Change</button>
+          <button type="button" class="btn-sm" onclick="openMapModal()">Change location</button>
         </div>
         <div id="locCoords" style="font-size:12px;color:var(--mut);margin-top:3px;">39.1836° N, 96.5717° W</div>
       </div>
@@ -321,33 +349,37 @@ td.rain-edited::after{content:'●';font-size:6px;color:var(--teal);vertical-ali
 
       <div class="grp grp-soil">
         <div class="gtitle">Soil</div>
-        <div style="margin-bottom:8px;">
-          <label>Texture</label>
-          <select id="soilType">
-            <option value="sand">Sand</option>
-            <option value="loamySand">Loamy Sand</option>
-            <option value="sandyLoam">Sandy Loam</option>
-            <option value="loam">Loam</option>
-            <option value="siltLoam" selected>Silt Loam</option>
-            <option value="clayLoam">Clay Loam</option>
-            <option value="sandyClay">Sandy Clay</option>
-            <option value="siltyClay">Silty Clay</option>
-            <option value="clay">Clay</option>
-          </select>
-        </div>
-        <label style="margin-bottom:2px;">Root Depth Profile</label>
-        <div class="radio-row">
-          <label><input type="radio" name="rdMode" value="dynamic" checked> Dynamic</label>
-          <label><input type="radio" name="rdMode" value="constant"> Constant</label>
-        </div>
-        <div class="fg fg-2" style="margin-top:10px;">
+        <div class="fg fg-2" style="margin-bottom:10px;">
           <div>
-            <label>Max. Root Depth (in)</label>
-            <input type="number" id="rootDepth" value="48" min="8" max="96">
+            <label>Texture</label>
+            <select id="soilType">
+              <option value="sand">Sand</option>
+              <option value="loamySand">Loamy Sand</option>
+              <option value="sandyLoam">Sandy Loam</option>
+              <option value="loam">Loam</option>
+              <option value="siltLoam" selected>Silt Loam</option>
+              <option value="clayLoam">Clay Loam</option>
+              <option value="sandyClay">Sandy Clay</option>
+              <option value="siltyClay">Silty Clay</option>
+              <option value="clay">Clay</option>
+            </select>
           </div>
           <div>
             <label>Initial Water (%TAW)</label>
             <input type="number" id="initWater" value="75" min="0" max="100">
+          </div>
+        </div>
+        <div class="fg fg-2">
+          <div>
+            <label style="margin-bottom:2px;">Root Depth Profile</label>
+            <div class="radio-row">
+              <label><input type="radio" name="rdMode" value="dynamic" checked> Dynamic</label>
+              <label><input type="radio" name="rdMode" value="constant"> Constant</label>
+            </div>
+          </div>
+          <div>
+            <label>Max. Root Depth (in)</label>
+            <input type="number" id="rootDepth" value="48" min="8" max="96">
           </div>
         </div>
       </div>
@@ -384,7 +416,7 @@ td.rain-edited::after{content:'●';font-size:6px;color:var(--teal);vertical-ali
           </div>
         </div>
         <!-- Live revolution time display -->
-        <p id="revTimeDisplay" style="font-size:13px;color:var(--mut);margin-bottom:8px;"></p>
+        <p id="revTimeDisplay" class="rev-display" style="margin-bottom:8px;"></p>
 
         <div style="margin-bottom:10px;">
           <label style="margin-bottom:4px;">Irrigation Strategy</label>
@@ -415,7 +447,10 @@ td.rain-edited::after{content:'●';font-size:6px;color:var(--teal);vertical-ali
   </div><!-- /setup-outer -->
 
   <div style="margin-top:16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
-    <button id="btnGenerate" class="btn-go" onclick="generateSchedule()">▶ Generate Schedule</button>
+    <div class="action-row">
+      <button id="btnGenerate" class="btn-go" onclick="generateSchedule()">▶ Generate Schedule</button>
+      <span class="hint">Pulls current weather and forecast for the selected location.</span>
+    </div>
   </div>
 </div>
 
@@ -430,11 +465,12 @@ td.rain-edited::after{content:'●';font-size:6px;color:var(--teal);vertical-ali
 
   <!-- AI Summary panel — always visible after first generate -->
   <div id="aiPanel" class="card no-print" style="display:none;">
-    <div id="aiLoading" style="display:none;">⏳ Analyzing your irrigation schedule…</div>
+    <div class="ai-hdr">Season outlook</div>
+    <div id="aiLoading" style="display:none;">Analyzing your irrigation schedule…</div>
     <div id="aiText"></div>
     <div style="margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-      <button id="btnAIRefresh" class="btn-sm" onclick="fetchAISummary()" style="display:none;">↺ Refresh AI</button>
-      <span id="aiStaleNote" style="display:none;font-size:13px;color:var(--amb);">⚠ Settings changed — refresh for updated analysis</span>
+      <button id="btnAIRefresh" class="btn-sm" onclick="fetchAISummary()" style="display:none;">↺ Refresh</button>
+      <span id="aiStaleNote" style="display:none;font-size:11.5px;color:var(--amb);">Settings changed — refresh for updated analysis</span>
     </div>
   </div>
 
@@ -448,8 +484,8 @@ td.rain-edited::after{content:'●';font-size:6px;color:var(--teal);vertical-ali
 
   <!-- Chart — always visible -->
   <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-      <span class="ctitle" style="margin:0;border:none;padding:0;">Soil Water Balance</span>
+    <div class="chart-hdr">
+      <span class="ctitle">Soil Water Balance</span>
       <div class="chart-toggle no-print">
         <button id="btnStorage"   class=""   onclick="toggleChartMode('storage')">Storage</button>
         <button id="btnDepletion" class="on" onclick="toggleChartMode('depletion')">Depletion</button>
@@ -461,18 +497,19 @@ td.rain-edited::after{content:'●';font-size:6px;color:var(--teal);vertical-ali
 
   <!-- Table — always visible -->
   <div class="card" id="tableCard">
-    <div class="no-print" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
-      <p class="note" style="margin:0;flex:1;">
-        💧 Click any observed rain cell to enter your own field measurement.
-      </p>
+    <div class="chart-hdr no-print">
+      <span class="ctitle">Daily Schedule</span>
       <div style="display:flex;gap:6px;flex-shrink:0;">
         <button class="btn-sm" onclick="window.print()">🖨 Print</button>
         <button class="btn-sm" onclick="downloadCSV()">⬇ CSV</button>
       </div>
     </div>
+    <p class="note no-print" style="margin-bottom:10px;">
+      💧 Click any observed rain cell to enter your own field measurement.
+    </p>
     <div class="legend no-print">
-      <span><span style="display:inline-block;width:3px;height:14px;background:#bbf7d0;border-radius:1px;vertical-align:middle;margin-right:4px;"></span>Observed</span>
-      <span><span style="display:inline-block;width:3px;height:14px;background:#bae6fd;border-radius:1px;vertical-align:middle;margin-right:4px;"></span>Forecast</span>
+      <span><span style="display:inline-block;width:3px;height:14px;background:var(--obs);border-radius:1px;vertical-align:middle;margin-right:4px;"></span>Observed</span>
+      <span><span style="display:inline-block;width:3px;height:14px;background:var(--fut);border-radius:1px;vertical-align:middle;margin-right:4px;"></span>Forecast</span>
     </div>
     <div class="tscroll">
       <table id="schedTable">
@@ -493,7 +530,7 @@ td.rain-edited::after{content:'●';font-size:6px;color:var(--teal);vertical-ali
         <tbody id="tbody"></tbody>
       </table>
     </div>
-    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-top:12px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-top:14px;padding-top:14px;border-top:1px solid var(--bdr);">
       <p class="note" style="margin:0;flex:1;">
         Soil Water Processes Lab | Agronomy | Kansas State University
         &nbsp;·&nbsp;
@@ -558,7 +595,7 @@ let kc = { ki:.30, km:1.20, ke:.60, li:30, ld:40, lm:50, ll:30 };
 
 const PL=38, PR=14, PT=26, PB=34;
 let _PW=450, _PH=120;
-const KC_MAX=1.5, KC_MIN=0.05, L_MIN=5;
+const KC_MAX=1.25, KC_MIN=0.05, L_MIN=5;
 
 const kcTotal = () => kc.li + kc.ld + kc.lm + kc.ll;
 const px  = d => PL + (d / kcTotal()) * _PW;
@@ -817,7 +854,7 @@ function updateRevDisplay(){
   const appD  = adRaw==='custom'?(parseFloat(document.getElementById('appDepthCustom').value)||1):parseFloat(adRaw);
   const revD  = (area*appD*27154)/(gpm*eff*60*24);
   const el    = document.getElementById('revTimeDisplay');
-  if(el) el.textContent = `Revolution time: ${revD.toFixed(1)} days at current settings`;
+  if(el) el.innerHTML = `Revolution time: <strong>${revD.toFixed(1)} days</strong> at current settings`;
 }
 function setMAD(pct){
   document.getElementById('mad').value=pct;
