@@ -16,9 +16,6 @@ Open `index.html` in any browser — no installation required.
 
 Corn · Soybean · Grain Sorghum · Winter Wheat · Sunflower
 
-## AI feature
-
-The AI summary requires a DigitalOcean Serverless Function proxy. Set `FUNCTION_URL` in `index.html` to your deployed function endpoint.
 
 ## License
 
